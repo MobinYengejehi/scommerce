@@ -137,6 +137,12 @@ type UserAccount[AccountID comparable] interface {
 	GetUserReviews(ctx context.Context, reviews []UserReview[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserReview[AccountID], error)
 	GetUserReviewCount(ctx context.Context) (uint64, error)
 
+	// Subscriptions
+	GetSubscriptions(ctx context.Context, subscriptions []ProductItemSubscription[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]ProductItemSubscription[AccountID], error)
+	GetSubscriptionCount(ctx context.Context) (uint64, error)
+	RemoveSubscription(ctx context.Context, subscription ProductItemSubscription[AccountID]) error
+	RemoveAllSubscriptions(ctx context.Context) error
+
 	// Tickets
 
 	ToBuiltinObject(ctx context.Context) (*BuiltinUserAccount[AccountID], error)
@@ -449,21 +455,60 @@ type ProductItem[AccountID comparable] interface {
 	ApplyFormObject(ctx context.Context, form *ProductItemForm[AccountID]) error
 }
 
+type RenewalHandlerFunc[AccountID comparable] func(ctx context.Context, subscription ProductItemSubscription[AccountID], account UserAccount[AccountID], productItem ProductItem[AccountID]) (success bool, amountCharged float64, err error)
+
 type ProductItemSubscriptionManager[AccountID comparable] interface {
+	GeneralAppObject
+
+	NewSubscription(ctx context.Context, account UserAccount[AccountID], productItem ProductItem[AccountID], duration time.Duration, subscriptionType string, autoRenew bool) (ProductItemSubscription[AccountID], error)
+	RemoveSubscription(ctx context.Context, subscription ProductItemSubscription[AccountID]) error
+	RemoveAllSubscriptions(ctx context.Context) error
+	GetSubscriptions(ctx context.Context, subscriptions []ProductItemSubscription[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]ProductItemSubscription[AccountID], error)
+	GetSubscriptionCount(ctx context.Context) (uint64, error)
+	GetUserSubscriptions(ctx context.Context, account UserAccount[AccountID], subscriptions []ProductItemSubscription[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]ProductItemSubscription[AccountID], error)
+	GetUserSubscriptionCount(ctx context.Context, account UserAccount[AccountID]) (uint64, error)
+	GetProductItemSubscriptions(ctx context.Context, productItem ProductItem[AccountID], subscriptions []ProductItemSubscription[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]ProductItemSubscription[AccountID], error)
+	GetProductItemSubscriptionCount(ctx context.Context, productItem ProductItem[AccountID]) (uint64, error)
+
+	SetRenewalHandler(ctx context.Context, handler RenewalHandlerFunc[AccountID]) error
+	ProcessExpiredSubscriptions(ctx context.Context) error
+
+	ToBuiltinObject(ctx context.Context) (*BuiltinProductItemSubscriptionManager[AccountID], error)
 }
 
-/*
-this product subscription structure looks like:
-
-	struct ProductSubscription[AccountID comparable] {
-		UserAccountID AccountID
-		ProductItem   ProductItem
-		Duration      time.Duration // 1 month for example or 6 month for example. like (time.Hour*24) * 30
-		Date          time.Time     // subscribed date time
-		Type          string        // subscription type for example 'private' or some other things like that which user will specify thats why its "string"
-	}
-*/
 type ProductItemSubscription[AccountID comparable] interface {
+	GeneralAppObject
+
+	GetID(ctx context.Context) (uint64, error)
+	GetUserAccountID(ctx context.Context) (AccountID, error)
+
+	GetProductItem(ctx context.Context) (ProductItem[AccountID], error)
+	SetProductItem(ctx context.Context, productItem ProductItem[AccountID]) error
+
+	GetSubscribedAt(ctx context.Context) (time.Time, error)
+	SetSubscribedAt(ctx context.Context, subscribedAt time.Time) error
+
+	GetExpiresAt(ctx context.Context) (time.Time, error)
+	SetExpiresAt(ctx context.Context, expiresAt time.Time) error
+
+	GetDuration(ctx context.Context) (time.Duration, error)
+	SetDuration(ctx context.Context, duration time.Duration) error
+
+	GetSubscriptionType(ctx context.Context) (string, error)
+	SetSubscriptionType(ctx context.Context, subscriptionType string) error
+
+	IsAutoRenew(ctx context.Context) (bool, error)
+	SetAutoRenew(ctx context.Context, autoRenew bool) error
+
+	IsActive(ctx context.Context) (bool, error)
+	SetActive(ctx context.Context, isActive bool) error
+
+	IsExpired(ctx context.Context) (bool, error)
+	Cancel(ctx context.Context) error
+
+	ToBuiltinObject(ctx context.Context) (*BuiltinProductItemSubscription[AccountID], error)
+	ToFormObject(ctx context.Context) (*ProductItemSubscriptionForm[AccountID], error)
+	ApplyFormObject(ctx context.Context, form *ProductItemSubscriptionForm[AccountID]) error
 }
 
 type CountryManager interface {

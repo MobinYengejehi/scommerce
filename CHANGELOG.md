@@ -1,6 +1,165 @@
 # Changelog
 
-## [Latest] - Item Attributes Feature
+## [Latest] - Product Subscriptions & Payment Improvements
+
+### 🎉 New Feature: Product Item Subscriptions
+
+Complete subscription management system for recurring billing and time-based access control!
+
+#### What's New
+
+**Subscription System**:
+- **Recurring Billing**: Automatic subscription renewals with customizable periods
+- **Time-Based Access**: Grant time-limited access to products and services
+- **Flexible Durations**: Support any subscription period (daily, weekly, monthly, annual, custom)
+- **Auto-Renewal**: Configurable automatic renewal on expiration
+- **Subscription Types**: Categorize subscriptions (basic, premium, trial, annual, etc.)
+- **Wallet Integration**: Seamless payment processing using user wallets
+
+**Manager Features**:
+- Create and manage subscriptions for users and products
+- Process expired subscriptions automatically via `Pulse()` or `ProcessExpiredSubscriptions()`
+- Query subscriptions by user, product, or globally
+- Custom renewal handlers for flexible billing logic
+- Concurrent renewal processing (up to 10 simultaneous renewals)
+
+**Subscription Entity**:
+- Track subscription status (active, expired, cancelled)
+- Flexible expiration dates and durations
+- Auto-renew toggles
+- Product item associations
+- Subscription type categorization
+
+#### Payment Logic Enhancement
+
+**Conditional Wallet Deduction**:
+- Renewal handlers now return `(success bool, amountCharged float64, error)`
+- Only deduct from wallet if `amountCharged > 0`
+- Support free renewals with `amountCharged = 0`
+- Enable promotional pricing, discounts, and credits
+
+**Default Renewal Handler**:
+```go
+// Checks wallet balance, validates funds, extends subscription
+// Returns: (true, price, nil) on success
+//          (false, 0, nil) on insufficient funds
+//          (false, 0, error) on errors
+```
+
+#### API Changes
+
+**New Interfaces**:
+- `ProductItemSubscriptionManager[AccountID]`
+- `ProductItemSubscription[AccountID]`
+- `RenewalHandlerFunc[AccountID]`
+
+**New Methods**:
+```go
+// Manager methods
+NewSubscription(ctx, account, productItem, duration, type, autoRenew)
+GetUserSubscriptions(ctx, account, subs, skip, limit, order)
+GetProductItemSubscriptions(ctx, item, subs, skip, limit, order)
+SetRenewalHandler(ctx, handler)
+ProcessExpiredSubscriptions(ctx)
+
+// Subscription methods
+GetExpiresAt(ctx) / SetExpiresAt(ctx, time)
+GetDuration(ctx) / SetDuration(ctx, duration)
+IsAutoRenew(ctx) / SetAutoRenew(ctx, enabled)
+IsActive(ctx) / SetActive(ctx, active)
+IsExpired(ctx)
+Cancel(ctx)
+```
+
+### Use Cases
+
+**Perfect For**:
+- 🎵 Music/video streaming services
+- 📰 Digital magazine subscriptions
+- 🎮 Gaming memberships and season passes
+- 💼 SaaS product billing
+- 🏋️ Fitness program access
+- 📚 Online course memberships
+- ☁️ Cloud storage tiers
+
+### Technical Details
+
+**Database**:
+- New `product_item_subscriptions` table
+- Indexed on `expires_at`, `user_account_id`, `product_item_id`
+- Supports concurrent renewal processing
+
+**Performance**:
+- Concurrent processing with semaphore (10 workers)
+- Batch processing up to 1000 subscriptions
+- Indexed queries for efficient expiration checks
+
+**Error Handling**:
+- Failed renewals remain expired for retry
+- Graceful handling of insufficient funds
+- Proper error propagation and logging
+
+**Files Modified**:
+- `scommerce/contracts.go` - Added subscription interfaces
+- `scommerce/db_contracts.go` - Added database contracts
+- `scommerce/product_item_subscription.go` - Core implementation
+- `scommerce/account.go` - Interface compatibility updates
+- `docs/product-subscriptions.md` - Complete documentation
+
+### Migration
+
+**For Existing Projects**:
+
+1. **Database Migration**: Run `Init()` on subscription manager to create tables
+2. **Update Code**: Access via `app.SubscriptionManager`
+3. **Schedule Renewals**: Call `manager.Pulse()` periodically (recommended: hourly)
+
+```go
+// Initialize subscription manager
+subManager := app.GetProductItemSubscriptionManager()
+if err := subManager.Init(ctx); err != nil {
+    return err
+}
+
+// Schedule periodic renewal processing
+go func() {
+    ticker := time.NewTicker(1 * time.Hour)
+    for range ticker.C {
+        subManager.Pulse(ctx)
+    }
+}()
+```
+
+### Documentation
+
+- **Complete Guide**: [docs/product-subscriptions.md](docs/product-subscriptions.md)
+- **README Updated**: Added subscription features to main README
+- **Examples**: 15+ code examples for common scenarios
+- **API Reference**: Full method documentation
+
+### Breaking Changes
+
+⚠️ **RenewalHandlerFunc Signature Changed**:
+```go
+// Old:
+func(ctx, subscription, account, productItem) (bool, error)
+
+// New:
+func(ctx, subscription, account, productItem) (success bool, amountCharged float64, err error)
+```
+
+If you implemented custom renewal handlers, update them to return the charge amount.
+
+### Performance Impact
+
+- ✅ Minimal overhead - subscriptions processed in background
+- ✅ Indexed queries for fast expiration lookups
+- ✅ Controlled concurrency prevents system overload
+- ✅ Batch processing limits resource usage
+
+---
+
+## [Previous] - Item Attributes Feature
 
 ### 🎉 New Feature: Item-Level Attributes
 

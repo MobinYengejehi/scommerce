@@ -16,6 +16,7 @@ S-Commerce is a comprehensive e-commerce library designed to help Go developers 
 - **Reviews & Ratings**: Customer reviews with rating aggregation
 - **Address Management**: Multiple addresses per user with default address support
 - **Item Customization**: Store user-specific customizations and metadata with cart and order items
+- **🆕 Subscriptions**: Recurring billing, automatic renewals, and time-based access control for digital products
 
 ### Technical Features
 - **Contract-Based Design**: All functionality defined through interfaces for maximum flexibility
@@ -204,6 +205,7 @@ S-Commerce follows a clean, layered architecture:
 | [Architecture](docs/architecture.md) | System design and component relationships |
 | [Getting Started](docs/getting-started.md) | Installation and first application |
 | [Item Attributes](docs/item-attributes.md) | **NEW!** Store customizations with cart and order items |
+| [Product Subscriptions](docs/product-subscriptions.md) | **NEW!** Recurring billing and subscription management |
 | [Contracts](docs/contracts.md) | Complete interface reference |
 | [Database Integration](docs/database-integration.md) | Implementing database persistence |
 | [File Storage](docs/file-storage.md) | File storage system guide |

@@ -21,14 +21,16 @@ type App[AccountID comparable] struct {
 	ShippingMethodManager ShippingMethodManager
 	OrderStatusManager    OrderStatusManager
 	UserReviewManager     UserReviewManager[AccountID]
+	SubscriptionManager   ProductItemSubscriptionManager[AccountID]
 }
 
 type AppConfig[AccountID comparable] struct {
-	DB             DBApplication[AccountID]
-	FileStorage    FileStorage
-	OTPCodeLength  int32
-	OTPTokenLength int32
-	OTPTTL         time.Duration
+	DB                         DBApplication[AccountID]
+	FileStorage                FileStorage
+	OTPCodeLength              int32
+	OTPTokenLength             int32
+	OTPTTL                     time.Duration
+	SubscriptionRenewalHandler RenewalHandlerFunc[AccountID]
 }
 
 func NewBuiltinApplication[AccountID comparable](conf *AppConfig[AccountID]) (*App[AccountID], error) {
@@ -43,6 +45,7 @@ func NewBuiltinApplication[AccountID comparable](conf *AppConfig[AccountID]) (*A
 	productManager := NewBuiltinProductManager(conf.DB, conf.FileStorage)
 	shoppingCartManager := NewBuiltinUserShoppingCartManager(conf.DB, conf.FileStorage, orderStatusManager)
 	userReviewManager := NewBuiltinUserReviewManager(conf.DB, conf.FileStorage)
+	subscriptionManager := NewBuiltinProductItemSubscriptionManager(conf.DB, conf.FileStorage, conf.SubscriptionRenewalHandler)
 
 	accountManager, err := NewBuiltinUserAccountManager(
 		conf.DB,
@@ -69,6 +72,7 @@ func NewBuiltinApplication[AccountID comparable](conf *AppConfig[AccountID]) (*A
 		ProductManager:        productManager,
 		ShoppingCartManager:   shoppingCartManager,
 		UserReviewManager:     userReviewManager,
+		SubscriptionManager:   subscriptionManager,
 	}, nil
 }
 
@@ -86,6 +90,7 @@ func (app *App[AccountID]) Close(ctx context.Context) error {
 	err = joinErr(err, app.PaymentTypeManager.Close(ctx))
 	err = joinErr(err, app.ShippingMethodManager.Close(ctx))
 	err = joinErr(err, app.OrderStatusManager.Close(ctx))
+	err = joinErr(err, app.SubscriptionManager.Close(ctx))
 
 	return err
 }
@@ -105,6 +110,7 @@ func (app *App[AccountID]) Init(ctx context.Context) error {
 	err = joinErr(err, app.ShoppingCartManager.Init(ctx))
 	err = joinErr(err, app.UserReviewManager.Init(ctx))
 	err = joinErr(err, app.OrderManager.Init(ctx))
+	err = joinErr(err, app.SubscriptionManager.Init(ctx))
 
 	return err
 }
@@ -121,9 +127,10 @@ func (app *App[AccountID]) Pulse(ctx context.Context) error {
 	err = joinErr(err, app.ProductManager.Pulse(ctx))
 	err = joinErr(err, app.CountryManager.Pulse(ctx))
 	err = joinErr(err, app.PaymentTypeManager.Pulse(ctx))
-	err = joinErr(err, app.ShippingMethodManager.Pulse(ctx))
+	err = joinErr(err, app.ShoppingCartManager.Pulse(ctx))
 	err = joinErr(err, app.OrderStatusManager.Pulse(ctx))
 	err = joinErr(err, app.UserReviewManager.Pulse(ctx))
+	err = joinErr(err, app.SubscriptionManager.Pulse(ctx))
 
 	return err
 }

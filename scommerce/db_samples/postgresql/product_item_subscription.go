@@ -1,0 +1,551 @@
+package dbsamples
+
+import (
+	"context"
+	"time"
+
+	"github.com/MobinYengejehi/scommerce/scommerce"
+)
+
+var _ scommerce.DBProductItemSubscriptionManager[UserAccountID] = &PostgreDatabase{}
+var _ scommerce.DBProductItemSubscription[UserAccountID] = &PostgreDatabase{}
+
+func (db *PostgreDatabase) InitProductItemSubscriptionManager(ctx context.Context) error {
+	_, err := db.PgxPool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS product_item_subscriptions (
+			id BIGSERIAL PRIMARY KEY,
+			user_account_id BIGINT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+			product_item_id BIGINT NOT NULL REFERENCES product_items(id) ON DELETE CASCADE,
+			subscribed_at TIMESTAMP NOT NULL,
+			expires_at TIMESTAMP NOT NULL,
+			duration_nanoseconds BIGINT NOT NULL,
+			subscription_type VARCHAR(255),
+			auto_renew BOOLEAN NOT NULL DEFAULT FALSE,
+			is_active BOOLEAN NOT NULL DEFAULT TRUE
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.PgxPool.Exec(ctx, `
+		CREATE INDEX IF NOT EXISTS idx_product_item_subscriptions_user_account_id ON product_item_subscriptions(user_account_id)
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.PgxPool.Exec(ctx, `
+		CREATE INDEX IF NOT EXISTS idx_product_item_subscriptions_product_item_id ON product_item_subscriptions(product_item_id)
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.PgxPool.Exec(ctx, `
+		CREATE INDEX IF NOT EXISTS idx_product_item_subscriptions_renewal ON product_item_subscriptions(expires_at, auto_renew, is_active)
+	`)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *PostgreDatabase) NewProductItemSubscription(ctx context.Context, userAccountID UserAccountID, productItemID uint64, subscribedAt time.Time, expiresAt time.Time, duration time.Duration, subscriptionType string, autoRenew bool, form *scommerce.ProductItemSubscriptionForm[UserAccountID]) (uint64, error) {
+	var id uint64
+	var savedSubscriptionType *string
+	if subscriptionType != "" {
+		savedSubscriptionType = &subscriptionType
+	}
+	
+	err := db.PgxPool.QueryRow(ctx, `
+		INSERT INTO product_item_subscriptions (user_account_id, product_item_id, subscribed_at, expires_at, duration_nanoseconds, subscription_type, auto_renew, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id
+	`, userAccountID, productItemID, subscribedAt, expiresAt, duration.Nanoseconds(), savedSubscriptionType, autoRenew, true).Scan(&id)
+	
+	if err != nil {
+		return 0, err
+	}
+	
+	if form != nil {
+		form.ID = id
+		form.UserAccountID = userAccountID
+		form.SubscribedAt = &subscribedAt
+		form.ExpiresAt = &expiresAt
+		form.Duration = &duration
+		if savedSubscriptionType != nil {
+			form.SubscriptionType = savedSubscriptionType
+		}
+		form.AutoRenew = &autoRenew
+		isActive := true
+		form.IsActive = &isActive
+	}
+	
+	return id, nil
+}
+
+func (db *PostgreDatabase) RemoveProductItemSubscription(ctx context.Context, subscriptionID uint64) error {
+	_, err := db.PgxPool.Exec(ctx, `
+		DELETE FROM product_item_subscriptions WHERE id = $1
+	`, subscriptionID)
+	return err
+}
+
+func (db *PostgreDatabase) RemoveAllProductItemSubscriptions(ctx context.Context) error {
+	_, err := db.PgxPool.Exec(ctx, `
+		DELETE FROM product_item_subscriptions
+	`)
+	return err
+}
+
+func (db *PostgreDatabase) GetProductItemSubscriptionCount(ctx context.Context) (uint64, error) {
+	var count uint64
+	err := db.PgxPool.QueryRow(ctx, `
+		SELECT COUNT(id) FROM product_item_subscriptions
+	`).Scan(&count)
+	return count, err
+}
+
+func (db *PostgreDatabase) GetProductItemSubscriptions(ctx context.Context, ids []uint64, forms []*scommerce.ProductItemSubscriptionForm[UserAccountID], skip int64, limit int64, queueOrder scommerce.QueueOrder) ([]uint64, []*scommerce.ProductItemSubscriptionForm[UserAccountID], error) {
+	resultIDs := ids
+	if resultIDs == nil {
+		resultIDs = make([]uint64, 0, 10)
+	}
+	resultForms := forms
+	if resultForms == nil {
+		resultForms = make([]*scommerce.ProductItemSubscriptionForm[UserAccountID], 0, cap(resultIDs))
+	}
+	
+	rows, err := db.PgxPool.Query(ctx, `
+		SELECT id, user_account_id, product_item_id, subscribed_at, expires_at, duration_nanoseconds, subscription_type, auto_renew, is_active
+		FROM product_item_subscriptions
+		ORDER BY id `+queueOrder.String()+`
+		OFFSET $1 LIMIT $2
+	`, skip, limit)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	
+	for rows.Next() {
+		form := &scommerce.ProductItemSubscriptionForm[UserAccountID]{}
+		var durationNanos int64
+		var subscriptionType *string
+		
+		err := rows.Scan(&form.ID, &form.UserAccountID, &form, &form.SubscribedAt, &form.ExpiresAt, &durationNanos, &subscriptionType, &form.AutoRenew, &form.IsActive)
+		if err != nil {
+			return nil, nil, err
+		}
+		
+		duration := time.Duration(durationNanos)
+		form.Duration = &duration
+		if subscriptionType != nil {
+			form.SubscriptionType = subscriptionType
+		}
+		
+		resultIDs = append(resultIDs, form.ID)
+		resultForms = append(resultForms, form)
+	}
+	
+	return resultIDs, resultForms, rows.Err()
+}
+
+func (db *PostgreDatabase) GetUserProductItemSubscriptions(ctx context.Context, userAccountID UserAccountID, ids []uint64, forms []*scommerce.ProductItemSubscriptionForm[UserAccountID], skip int64, limit int64, queueOrder scommerce.QueueOrder) ([]uint64, []*scommerce.ProductItemSubscriptionForm[UserAccountID], error) {
+	resultIDs := ids
+	if resultIDs == nil {
+		resultIDs = make([]uint64, 0, 10)
+	}
+	resultForms := forms
+	if resultForms == nil {
+		resultForms = make([]*scommerce.ProductItemSubscriptionForm[UserAccountID], 0, cap(resultIDs))
+	}
+	
+	rows, err := db.PgxPool.Query(ctx, `
+		SELECT id, user_account_id, product_item_id, subscribed_at, expires_at, duration_nanoseconds, subscription_type, auto_renew, is_active
+		FROM product_item_subscriptions
+		WHERE user_account_id = $1
+		ORDER BY id `+queueOrder.String()+`
+		OFFSET $2 LIMIT $3
+	`, userAccountID, skip, limit)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	
+	for rows.Next() {
+		form := &scommerce.ProductItemSubscriptionForm[UserAccountID]{}
+		var durationNanos int64
+		var subscriptionType *string
+		var productItemID uint64
+		
+		err := rows.Scan(&form.ID, &form.UserAccountID, &productItemID, &form.SubscribedAt, &form.ExpiresAt, &durationNanos, &subscriptionType, &form.AutoRenew, &form.IsActive)
+		if err != nil {
+			return nil, nil, err
+		}
+		
+		duration := time.Duration(durationNanos)
+		form.Duration = &duration
+		if subscriptionType != nil {
+			form.SubscriptionType = subscriptionType
+		}
+		
+		resultIDs = append(resultIDs, form.ID)
+		resultForms = append(resultForms, form)
+	}
+	
+	return resultIDs, resultForms, rows.Err()
+}
+
+func (db *PostgreDatabase) GetUserProductItemSubscriptionCount(ctx context.Context, userAccountID UserAccountID) (uint64, error) {
+	var count uint64
+	err := db.PgxPool.QueryRow(ctx, `
+		SELECT COUNT(id) FROM product_item_subscriptions WHERE user_account_id = $1
+	`, userAccountID).Scan(&count)
+	return count, err
+}
+
+func (db *PostgreDatabase) GetProductItemSubscriptionsForProduct(ctx context.Context, productItemID uint64, ids []uint64, forms []*scommerce.ProductItemSubscriptionForm[UserAccountID], skip int64, limit int64, queueOrder scommerce.QueueOrder) ([]uint64, []*scommerce.ProductItemSubscriptionForm[UserAccountID], error) {
+	resultIDs := ids
+	if resultIDs == nil {
+		resultIDs = make([]uint64, 0, 10)
+	}
+	resultForms := forms
+	if resultForms == nil {
+		resultForms = make([]*scommerce.ProductItemSubscriptionForm[UserAccountID], 0, cap(resultIDs))
+	}
+	
+	rows, err := db.PgxPool.Query(ctx, `
+		SELECT id, user_account_id, product_item_id, subscribed_at, expires_at, duration_nanoseconds, subscription_type, auto_renew, is_active
+		FROM product_item_subscriptions
+		WHERE product_item_id = $1
+		ORDER BY id `+queueOrder.String()+`
+		OFFSET $2 LIMIT $3
+	`, productItemID, skip, limit)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	
+	for rows.Next() {
+		form := &scommerce.ProductItemSubscriptionForm[UserAccountID]{}
+		var durationNanos int64
+		var subscriptionType *string
+		var prodItemID uint64
+		
+		err := rows.Scan(&form.ID, &form.UserAccountID, &prodItemID, &form.SubscribedAt, &form.ExpiresAt, &durationNanos, &subscriptionType, &form.AutoRenew, &form.IsActive)
+		if err != nil {
+			return nil, nil, err
+		}
+		
+		duration := time.Duration(durationNanos)
+		form.Duration = &duration
+		if subscriptionType != nil {
+			form.SubscriptionType = subscriptionType
+		}
+		
+		resultIDs = append(resultIDs, form.ID)
+		resultForms = append(resultForms, form)
+	}
+	
+	return resultIDs, resultForms, rows.Err()
+}
+
+func (db *PostgreDatabase) GetProductItemSubscriptionCountForProduct(ctx context.Context, productItemID uint64) (uint64, error) {
+	var count uint64
+	err := db.PgxPool.QueryRow(ctx, `
+		SELECT COUNT(id) FROM product_item_subscriptions WHERE product_item_id = $1
+	`, productItemID).Scan(&count)
+	return count, err
+}
+
+func (db *PostgreDatabase) GetExpiredSubscriptionsForRenewal(ctx context.Context, now time.Time, ids []uint64, forms []*scommerce.ProductItemSubscriptionForm[UserAccountID], limit int64) ([]uint64, []*scommerce.ProductItemSubscriptionForm[UserAccountID], error) {
+	resultIDs := ids
+	if resultIDs == nil {
+		resultIDs = make([]uint64, 0, 10)
+	}
+	resultForms := forms
+	if resultForms == nil {
+		resultForms = make([]*scommerce.ProductItemSubscriptionForm[UserAccountID], 0, cap(resultIDs))
+	}
+	
+	rows, err := db.PgxPool.Query(ctx, `
+		SELECT id, user_account_id, product_item_id, subscribed_at, expires_at, duration_nanoseconds, subscription_type, auto_renew, is_active
+		FROM product_item_subscriptions
+		WHERE expires_at <= $1 AND auto_renew = true AND is_active = true
+		ORDER BY expires_at ASC
+		LIMIT $2
+	`, now, limit)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	
+	for rows.Next() {
+		form := &scommerce.ProductItemSubscriptionForm[UserAccountID]{}
+		var durationNanos int64
+		var subscriptionType *string
+		var productItemID uint64
+		
+		err := rows.Scan(&form.ID, &form.UserAccountID, &productItemID, &form.SubscribedAt, &form.ExpiresAt, &durationNanos, &subscriptionType, &form.AutoRenew, &form.IsActive)
+		if err != nil {
+			return nil, nil, err
+		}
+		
+		duration := time.Duration(durationNanos)
+		form.Duration = &duration
+		if subscriptionType != nil {
+			form.SubscriptionType = subscriptionType
+		}
+		
+		resultIDs = append(resultIDs, form.ID)
+		resultForms = append(resultForms, form)
+	}
+	
+	return resultIDs, resultForms, rows.Err()
+}
+
+func (db *PostgreDatabase) GetProductItemSubscriptionUserAccountID(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64) (UserAccountID, error) {
+	var userAccountID UserAccountID
+	err := db.PgxPool.QueryRow(ctx, `
+		SELECT user_account_id FROM product_item_subscriptions WHERE id = $1
+	`, subscriptionID).Scan(&userAccountID)
+	if err != nil {
+		return 0, err
+	}
+	if form != nil {
+		form.UserAccountID = userAccountID
+	}
+	return userAccountID, nil
+}
+
+func (db *PostgreDatabase) GetProductItemSubscriptionProductItem(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64, productItemForm *scommerce.ProductItemForm[UserAccountID], fs scommerce.FileStorage) (uint64, error) {
+	var productItemID uint64
+	err := db.PgxPool.QueryRow(ctx, `
+		SELECT product_item_id FROM product_item_subscriptions WHERE id = $1
+	`, subscriptionID).Scan(&productItemID)
+	if err != nil {
+		return 0, err
+	}
+	
+	if productItemForm != nil && productItemID != 0 {
+		// Fetch product item details if needed
+		productItemForm.ID = productItemID
+		if form != nil {
+			form.ProductItem = &scommerce.BuiltinProductItem[UserAccountID]{
+				DB: db,
+				FS: fs,
+				ProductItemForm: *productItemForm,
+			}
+		}
+	}
+	
+	return productItemID, nil
+}
+
+func (db *PostgreDatabase) SetProductItemSubscriptionProductItem(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64, productItemID uint64, fs scommerce.FileStorage) error {
+	_, err := db.PgxPool.Exec(ctx, `
+		UPDATE product_item_subscriptions SET product_item_id = $1 WHERE id = $2
+	`, productItemID, subscriptionID)
+	if err != nil {
+		return err
+	}
+	
+	if form != nil {
+		productItemForm := scommerce.ProductItemForm[UserAccountID]{ID: productItemID}
+		form.ProductItem = &scommerce.BuiltinProductItem[UserAccountID]{
+			DB:              db,
+			FS:              fs,
+			ProductItemForm: productItemForm,
+		}
+	}
+	
+	return nil
+}
+
+func (db *PostgreDatabase) GetProductItemSubscriptionSubscribedAt(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64) (time.Time, error) {
+	var subscribedAt time.Time
+	err := db.PgxPool.QueryRow(ctx, `
+		SELECT subscribed_at FROM product_item_subscriptions WHERE id = $1
+	`, subscriptionID).Scan(&subscribedAt)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if form != nil {
+		form.SubscribedAt = &subscribedAt
+	}
+	return subscribedAt, nil
+}
+
+func (db *PostgreDatabase) SetProductItemSubscriptionSubscribedAt(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64, subscribedAt time.Time) error {
+	_, err := db.PgxPool.Exec(ctx, `
+		UPDATE product_item_subscriptions SET subscribed_at = $1 WHERE id = $2
+	`, subscribedAt, subscriptionID)
+	if err != nil {
+		return err
+	}
+	if form != nil {
+		form.SubscribedAt = &subscribedAt
+	}
+	return nil
+}
+
+func (db *PostgreDatabase) GetProductItemSubscriptionExpiresAt(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64) (time.Time, error) {
+	var expiresAt time.Time
+	err := db.PgxPool.QueryRow(ctx, `
+		SELECT expires_at FROM product_item_subscriptions WHERE id = $1
+	`, subscriptionID).Scan(&expiresAt)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if form != nil {
+		form.ExpiresAt = &expiresAt
+	}
+	return expiresAt, nil
+}
+
+func (db *PostgreDatabase) SetProductItemSubscriptionExpiresAt(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64, expiresAt time.Time) error {
+	_, err := db.PgxPool.Exec(ctx, `
+		UPDATE product_item_subscriptions SET expires_at = $1 WHERE id = $2
+	`, expiresAt, subscriptionID)
+	if err != nil {
+		return err
+	}
+	if form != nil {
+		form.ExpiresAt = &expiresAt
+	}
+	return nil
+}
+
+func (db *PostgreDatabase) GetProductItemSubscriptionDuration(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64) (time.Duration, error) {
+	var durationNanos int64
+	err := db.PgxPool.QueryRow(ctx, `
+		SELECT duration_nanoseconds FROM product_item_subscriptions WHERE id = $1
+	`, subscriptionID).Scan(&durationNanos)
+	if err != nil {
+		return 0, err
+	}
+	duration := time.Duration(durationNanos)
+	if form != nil {
+		form.Duration = &duration
+	}
+	return duration, nil
+}
+
+func (db *PostgreDatabase) SetProductItemSubscriptionDuration(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64, duration time.Duration) error {
+	_, err := db.PgxPool.Exec(ctx, `
+		UPDATE product_item_subscriptions SET duration_nanoseconds = $1 WHERE id = $2
+	`, duration.Nanoseconds(), subscriptionID)
+	if err != nil {
+		return err
+	}
+	if form != nil {
+		form.Duration = &duration
+	}
+	return nil
+}
+
+func (db *PostgreDatabase) GetProductItemSubscriptionType(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64) (string, error) {
+	var subscriptionType *string
+	err := db.PgxPool.QueryRow(ctx, `
+		SELECT subscription_type FROM product_item_subscriptions WHERE id = $1
+	`, subscriptionID).Scan(&subscriptionType)
+	if err != nil {
+		return "", err
+	}
+	result := ""
+	if subscriptionType != nil {
+		result = *subscriptionType
+		if form != nil {
+			form.SubscriptionType = subscriptionType
+		}
+	}
+	return result, nil
+}
+
+func (db *PostgreDatabase) SetProductItemSubscriptionType(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64, subscriptionType string) error {
+	var savedType *string
+	if subscriptionType != "" {
+		savedType = &subscriptionType
+	}
+	_, err := db.PgxPool.Exec(ctx, `
+		UPDATE product_item_subscriptions SET subscription_type = $1 WHERE id = $2
+	`, savedType, subscriptionID)
+	if err != nil {
+		return err
+	}
+	if form != nil {
+		form.SubscriptionType = savedType
+	}
+	return nil
+}
+
+func (db *PostgreDatabase) IsProductItemSubscriptionAutoRenew(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64) (bool, error) {
+	var autoRenew bool
+	err := db.PgxPool.QueryRow(ctx, `
+		SELECT auto_renew FROM product_item_subscriptions WHERE id = $1
+	`, subscriptionID).Scan(&autoRenew)
+	if err != nil {
+		return false, err
+	}
+	if form != nil {
+		form.AutoRenew = &autoRenew
+	}
+	return autoRenew, nil
+}
+
+func (db *PostgreDatabase) SetProductItemSubscriptionAutoRenew(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64, autoRenew bool) error {
+	_, err := db.PgxPool.Exec(ctx, `
+		UPDATE product_item_subscriptions SET auto_renew = $1 WHERE id = $2
+	`, autoRenew, subscriptionID)
+	if err != nil {
+		return err
+	}
+	if form != nil {
+		form.AutoRenew = &autoRenew
+	}
+	return nil
+}
+
+func (db *PostgreDatabase) IsProductItemSubscriptionActive(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64) (bool, error) {
+	var isActive bool
+	err := db.PgxPool.QueryRow(ctx, `
+		SELECT is_active FROM product_item_subscriptions WHERE id = $1
+	`, subscriptionID).Scan(&isActive)
+	if err != nil {
+		return false, err
+	}
+	if form != nil {
+		form.IsActive = &isActive
+	}
+	return isActive, nil
+}
+
+func (db *PostgreDatabase) SetProductItemSubscriptionActive(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64, isActive bool) error {
+	_, err := db.PgxPool.Exec(ctx, `
+		UPDATE product_item_subscriptions SET is_active = $1 WHERE id = $2
+	`, isActive, subscriptionID)
+	if err != nil {
+		return err
+	}
+	if form != nil {
+		form.IsActive = &isActive
+	}
+	return nil
+}
+
+func (db *PostgreDatabase) CancelProductItemSubscription(ctx context.Context, form *scommerce.ProductItemSubscriptionForm[UserAccountID], subscriptionID uint64) error {
+	_, err := db.PgxPool.Exec(ctx, `
+		UPDATE product_item_subscriptions SET is_active = false, auto_renew = false WHERE id = $1
+	`, subscriptionID)
+	if err != nil {
+		return err
+	}
+	if form != nil {
+		falseVal := false
+		form.IsActive = &falseVal
+		form.AutoRenew = &falseVal
+	}
+	return nil
+}

@@ -15,6 +15,7 @@ type userAccountDatabase[AccountID comparable] interface {
 	userPaymentMethodDatabase[AccountID]
 	userOrderDatabase[AccountID]
 	userShoppingCartDatabase[AccountID]
+	productItemSubscriptionDatabase[AccountID]
 	DBUserRole
 }
 
@@ -1800,6 +1801,112 @@ func (account *BuiltinUserAccount[AccountID]) GetUserReviewCount(ctx context.Con
 		return 0, err
 	}
 	return count, nil
+}
+
+func (account *BuiltinUserAccount[AccountID]) GetSubscriptions(ctx context.Context, subscriptions []ProductItemSubscription[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]ProductItemSubscription[AccountID], error) {
+	id, err := account.GetID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	form, err := account.UserAccountForm.Clone(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]uint64, 0, GetSafeLimit(limit))
+	subscriptionForms := make([]*ProductItemSubscriptionForm[AccountID], 0, cap(ids))
+	ids, subscriptionForms, err = account.DB.GetUserAccountSubscriptions(ctx, &form, id, ids, subscriptionForms, skip, limit, queueOrder)
+	if err != nil {
+		return nil, err
+	}
+	if err := account.ApplyFormObject(ctx, &form); err != nil {
+		return nil, err
+	}
+
+	subs := subscriptions
+	if subs == nil {
+		subs = make([]ProductItemSubscription[AccountID], 0, len(ids))
+	}
+
+	for i := range len(ids) {
+		sub := &BuiltinProductItemSubscription[AccountID]{
+			ProductItemSubscriptionForm: ProductItemSubscriptionForm[AccountID]{
+				ID:            ids[i],
+				UserAccountID: id,
+			},
+			DB: account.DB,
+			FS: account.FS,
+		}
+		if err := sub.Init(ctx); err != nil {
+			return nil, err
+		}
+		if subscriptionForms[i] != nil {
+			if err := sub.ApplyFormObject(ctx, subscriptionForms[i]); err != nil {
+				return nil, err
+			}
+		}
+		subs = append(subs, sub)
+	}
+
+	return subs, nil
+}
+
+func (account *BuiltinUserAccount[AccountID]) GetSubscriptionCount(ctx context.Context) (uint64, error) {
+	id, err := account.GetID(ctx)
+	if err != nil {
+		return 0, err
+	}
+	form, err := account.UserAccountForm.Clone(ctx)
+	if err != nil {
+		return 0, err
+	}
+	count, err := account.DB.GetUserAccountSubscriptionCount(ctx, &form, id)
+	if err != nil {
+		return 0, err
+	}
+	if err := account.ApplyFormObject(ctx, &form); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (account *BuiltinUserAccount[AccountID]) RemoveSubscription(ctx context.Context, subscription ProductItemSubscription[AccountID]) error {
+	id, err := account.GetID(ctx)
+	if err != nil {
+		return err
+	}
+	subscriptionID, err := subscription.GetID(ctx)
+	if err != nil {
+		return err
+	}
+	form, err := account.UserAccountForm.Clone(ctx)
+	if err != nil {
+		return err
+	}
+	if err := account.DB.RemoveUserAccountSubscription(ctx, &form, id, subscriptionID); err != nil {
+		return err
+	}
+	if err := account.ApplyFormObject(ctx, &form); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (account *BuiltinUserAccount[AccountID]) RemoveAllSubscriptions(ctx context.Context) error {
+	id, err := account.GetID(ctx)
+	if err != nil {
+		return err
+	}
+	form, err := account.UserAccountForm.Clone(ctx)
+	if err != nil {
+		return err
+	}
+	if err := account.DB.RemoveAllUserAccountSubscriptions(ctx, &form, id); err != nil {
+		return err
+	}
+	if err := account.ApplyFormObject(ctx, &form); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (account *BuiltinUserAccount[AccountID]) ToBuiltinObject(ctx context.Context) (*BuiltinUserAccount[AccountID], error) {

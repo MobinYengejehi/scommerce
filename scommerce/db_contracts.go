@@ -26,6 +26,8 @@ type DBApplication[AccountID comparable] interface {
 	DBProductCategory[AccountID]
 	DBProduct[AccountID]
 	DBProductItem[AccountID]
+	DBProductItemSubscriptionManager[AccountID]
+	DBProductItemSubscription[AccountID]
 	DBCountryManager
 	DBCountry
 	DBPaymentTypeManager
@@ -77,6 +79,10 @@ type DBUserAccount[AccountID comparable] interface {
 	GetUserAccountWalletCurrency(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (float64, error)
 	GetUserAccountUserReviews(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID, ids []uint64, reviewForms []*UserReviewForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]uint64, []*UserReviewForm[AccountID], error)
 	GetUserAccountUserReviewCount(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (uint64, error)
+	GetUserAccountSubscriptions(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID, ids []uint64, subscriptionForms []*ProductItemSubscriptionForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]uint64, []*ProductItemSubscriptionForm[AccountID], error)
+	GetUserAccountSubscriptionCount(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (uint64, error)
+	RemoveUserAccountSubscription(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID, subscriptionID uint64) error
+	RemoveAllUserAccountSubscriptions(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) error
 	HasUserAccountPenalty(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (bool, error)
 	IsUserAccountActive(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (bool, error)
 	IsUserAccountBanned(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (string, error)
@@ -415,4 +421,37 @@ type DBUserReview[AccountID comparable] interface {
 	GetUserReviewComment(ctx context.Context, form *UserReviewForm[AccountID], reviewID uint64) (string, error)
 	SetUserReviewComment(ctx context.Context, form *UserReviewForm[AccountID], reviewID uint64, comment string) error
 	GetUserReviewProductItem(ctx context.Context, form *UserReviewForm[AccountID], reviewID uint64, productItemForm *ProductItemForm[AccountID], fs FileStorage) (uint64, error)
+}
+
+type DBProductItemSubscriptionManager[AccountID comparable] interface {
+	InitProductItemSubscriptionManager(ctx context.Context) error
+	NewProductItemSubscription(ctx context.Context, userAccountID AccountID, productItemID uint64, subscribedAt time.Time, expiresAt time.Time, duration time.Duration, subscriptionType string, autoRenew bool, form *ProductItemSubscriptionForm[AccountID]) (uint64, error)
+	RemoveProductItemSubscription(ctx context.Context, subscriptionID uint64) error
+	RemoveAllProductItemSubscriptions(ctx context.Context) error
+	GetProductItemSubscriptionCount(ctx context.Context) (uint64, error)
+	GetProductItemSubscriptions(ctx context.Context, ids []uint64, forms []*ProductItemSubscriptionForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]uint64, []*ProductItemSubscriptionForm[AccountID], error)
+	GetUserProductItemSubscriptions(ctx context.Context, userAccountID AccountID, ids []uint64, forms []*ProductItemSubscriptionForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]uint64, []*ProductItemSubscriptionForm[AccountID], error)
+	GetUserProductItemSubscriptionCount(ctx context.Context, userAccountID AccountID) (uint64, error)
+	GetProductItemSubscriptionsForProduct(ctx context.Context, productItemID uint64, ids []uint64, forms []*ProductItemSubscriptionForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]uint64, []*ProductItemSubscriptionForm[AccountID], error)
+	GetProductItemSubscriptionCountForProduct(ctx context.Context, productItemID uint64) (uint64, error)
+	GetExpiredSubscriptionsForRenewal(ctx context.Context, now time.Time, ids []uint64, forms []*ProductItemSubscriptionForm[AccountID], limit int64) ([]uint64, []*ProductItemSubscriptionForm[AccountID], error)
+}
+
+type DBProductItemSubscription[AccountID comparable] interface {
+	GetProductItemSubscriptionUserAccountID(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64) (AccountID, error)
+	GetProductItemSubscriptionProductItem(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64, productItemForm *ProductItemForm[AccountID], fs FileStorage) (uint64, error)
+	SetProductItemSubscriptionProductItem(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64, productItemID uint64, fs FileStorage) error
+	GetProductItemSubscriptionSubscribedAt(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64) (time.Time, error)
+	SetProductItemSubscriptionSubscribedAt(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64, subscribedAt time.Time) error
+	GetProductItemSubscriptionExpiresAt(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64) (time.Time, error)
+	SetProductItemSubscriptionExpiresAt(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64, expiresAt time.Time) error
+	GetProductItemSubscriptionDuration(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64) (time.Duration, error)
+	SetProductItemSubscriptionDuration(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64, duration time.Duration) error
+	GetProductItemSubscriptionType(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64) (string, error)
+	SetProductItemSubscriptionType(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64, subscriptionType string) error
+	IsProductItemSubscriptionAutoRenew(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64) (bool, error)
+	SetProductItemSubscriptionAutoRenew(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64, autoRenew bool) error
+	IsProductItemSubscriptionActive(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64) (bool, error)
+	SetProductItemSubscriptionActive(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64, isActive bool) error
+	CancelProductItemSubscription(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64) error
 }

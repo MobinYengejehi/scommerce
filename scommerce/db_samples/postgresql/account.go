@@ -1701,3 +1701,30 @@ func (db *PostgreDatabase) GetUserAccountUserReviewCount(ctx context.Context, fo
 	}
 	return count, nil
 }
+
+func (db *PostgreDatabase) GetUserAccountSubscriptions(ctx context.Context, form *scommerce.UserAccountForm[UserAccountID], aid UserAccountID, ids []uint64, subscriptionForms []*scommerce.ProductItemSubscriptionForm[UserAccountID], skip int64, limit int64, queueOrder scommerce.QueueOrder) ([]uint64, []*scommerce.ProductItemSubscriptionForm[UserAccountID], error) {
+	return db.GetUserProductItemSubscriptions(ctx, aid, ids, subscriptionForms, skip, limit, queueOrder)
+}
+
+func (db *PostgreDatabase) GetUserAccountSubscriptionCount(ctx context.Context, form *scommerce.UserAccountForm[UserAccountID], aid UserAccountID) (uint64, error) {
+	return db.GetUserProductItemSubscriptionCount(ctx, aid)
+}
+
+func (db *PostgreDatabase) RemoveUserAccountSubscription(ctx context.Context, form *scommerce.UserAccountForm[UserAccountID], aid UserAccountID, subscriptionID uint64) error {
+	_, err := db.PgxPool.Exec(
+		ctx,
+		`DELETE FROM product_item_subscriptions WHERE id = $1 AND user_account_id = $2`,
+		subscriptionID,
+		aid,
+	)
+	return err
+}
+
+func (db *PostgreDatabase) RemoveAllUserAccountSubscriptions(ctx context.Context, form *scommerce.UserAccountForm[UserAccountID], aid UserAccountID) error {
+	_, err := db.PgxPool.Exec(
+		ctx,
+		`DELETE FROM product_item_subscriptions WHERE user_account_id = $1`,
+		aid,
+	)
+	return err
+}
