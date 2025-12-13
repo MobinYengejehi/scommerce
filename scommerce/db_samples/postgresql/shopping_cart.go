@@ -467,10 +467,13 @@ func (db *PostgreDatabase) InitUserShoppingCartManager(ctx context.Context) erro
 			declare
 				v_user_id bigint;
 				v_order_id bigint;
+				v_factor_id bigint;
 				v_total double precision;
 				v_product_items jsonb;
 				v_count bigint;
+				v_wallet_balance double precision;
 			begin
+				-- Retrieve user ID from shopping cart
 				select sc.user_id into v_user_id
 				from shopping_carts sc
 				where sc.id = cart_id_arg;
@@ -479,17 +482,22 @@ func (db *PostgreDatabase) InitUserShoppingCartManager(ctx context.Context) erro
 					raise exception 'Shopping cart not found';
 				end if;
 
+				-- Aggregate product items with full details
 				select jsonb_agg(
 					jsonb_build_object(
 						'product_item_id', sci.product_item_id,
+						'name', pi.name,
 						'quantity', sci.quantity,
+						'price', pi.price,
 						'attributes', coalesce(sci.attributes, 'null'::jsonb)
 					)
 				), count(*)
 				into v_product_items, v_count
 				from shopping_cart_items sci
+				join product_items pi on sci.product_item_id = pi.id
 				where sci.cart_id = cart_id_arg;
 
+				-- Calculate total amount
 				select coalesce(sum(sci.quantity * pi.price), 0) + coalesce(sm.price, 0)
 				into v_total
 				from shopping_cart_items sci
@@ -498,6 +506,37 @@ func (db *PostgreDatabase) InitUserShoppingCartManager(ctx context.Context) erro
 				where sci.cart_id = cart_id_arg and sm.id = shipping_method_arg
 				group by sm.price;
 
+				-- Validate wallet balance
+				select wallet into v_wallet_balance
+				from users
+				where id = v_user_id;
+
+				if v_wallet_balance < v_total then
+					raise exception 'Insufficient funds: wallet balance is %, required amount is %', v_wallet_balance, v_total;
+				end if;
+
+				-- Create factor record
+				insert into factors (
+					user_id,
+					products,
+					discount,
+					tax,
+					amount_paid
+				) values (
+					v_user_id,
+					v_product_items,
+					0,
+					0,
+					v_total
+				)
+				returning id into v_factor_id;
+
+				-- Deduct amount from user wallet
+				update users
+				set wallet = wallet - v_total
+				where id = v_user_id;
+
+				-- Create order record
 				insert into orders (
 					user_id,
 					order_date,
@@ -521,8 +560,10 @@ func (db *PostgreDatabase) InitUserShoppingCartManager(ctx context.Context) erro
 				)
 				returning id into v_order_id;
 
+				-- Delete shopping cart
 				delete from shopping_carts where "id" = cart_id_arg;
 
+				-- Return results
 				return query
 				select 
 					v_order_id,

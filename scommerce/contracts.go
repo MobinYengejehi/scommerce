@@ -143,6 +143,10 @@ type UserAccount[AccountID comparable] interface {
 	RemoveSubscription(ctx context.Context, subscription ProductItemSubscription[AccountID]) error
 	RemoveAllSubscriptions(ctx context.Context) error
 
+	// Factors
+	GetUserFactors(ctx context.Context, factors []UserFactor[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserFactor[AccountID], error)
+	GetUserFactorCount(ctx context.Context) (uint64, error)
+
 	// Tickets
 
 	ToBuiltinObject(ctx context.Context) (*BuiltinUserAccount[AccountID], error)
@@ -364,21 +368,36 @@ type UserShoppingCartItem[AccountID comparable] interface {
 }
 
 type UserFactorManager[AccountID comparable] interface {
+	GeneralAppObject
+
+	GetUserFactors(ctx context.Context, account UserAccount[AccountID], factors []UserFactor[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserFactor[AccountID], error)
+	GetUserFactorCount(ctx context.Context, account UserAccount[AccountID]) (uint64, error)
+	RemoveAllUserFactors(ctx context.Context) error
+
+	ToBuiltinObject(ctx context.Context) (*BuiltinUserFactorManager[AccountID], error)
 }
 
-/*
-this user factor structure must look like this:
-
-	struct UserFactor[AccountID comparable] {
-		UserAccountID AccountID
-		ID  uint64
-		Products json.RawMessage // this contains the list of items with 'id' and 'item display names' and its count and price
-		Discount   float64
-		Tax        float64
-		AmountPaid float64
-	}
-*/
 type UserFactor[AccountID comparable] interface {
+	GeneralAppObject
+
+	GetID(ctx context.Context) (uint64, error)
+	GetUserAccountID(ctx context.Context) (AccountID, error)
+
+	GetProducts(ctx context.Context) (json.RawMessage, error)
+	SetProducts(ctx context.Context, products json.RawMessage) error
+
+	GetDiscount(ctx context.Context) (float64, error)
+	SetDiscount(ctx context.Context, discount float64) error
+
+	GetTax(ctx context.Context) (float64, error)
+	SetTax(ctx context.Context, tax float64) error
+
+	GetAmountPaid(ctx context.Context) (float64, error)
+	SetAmountPaid(ctx context.Context, amountPaid float64) error
+
+	ToBuiltinObject(ctx context.Context) (*BuiltinUserFactor[AccountID], error)
+	ToFormObject(ctx context.Context) (*UserFactorForm[AccountID], error)
+	ApplyFormObject(ctx context.Context, form *UserFactorForm[AccountID]) error
 }
 
 type ProductManager[AccountID comparable] interface {

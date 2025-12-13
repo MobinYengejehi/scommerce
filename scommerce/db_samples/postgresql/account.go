@@ -1728,3 +1728,11 @@ func (db *PostgreDatabase) RemoveAllUserAccountSubscriptions(ctx context.Context
 	)
 	return err
 }
+
+func (db *PostgreDatabase) GetUserAccountUserFactors(ctx context.Context, form *scommerce.UserAccountForm[UserAccountID], aid UserAccountID, ids []uint64, factorForms []*scommerce.UserFactorForm[UserAccountID], skip int64, limit int64, queueOrder scommerce.QueueOrder) ([]uint64, []*scommerce.UserFactorForm[UserAccountID], error) {
+	return db.GetUserFactors(ctx, aid, ids, factorForms, skip, limit, queueOrder)
+}
+
+func (db *PostgreDatabase) GetUserAccountUserFactorCount(ctx context.Context, form *scommerce.UserAccountForm[UserAccountID], aid UserAccountID) (uint64, error) {
+	return db.GetUserFactorCount(ctx, aid)
+}

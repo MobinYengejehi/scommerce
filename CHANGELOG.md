@@ -1,6 +1,136 @@
 # Changelog
 
-## [Latest] - Product Subscriptions & Payment Improvements
+## [Latest] - User Factor Documentation
+
+### 📚 Documentation: User Factors (Invoices/Receipts)
+
+Comprehensive documentation added for the User Factor system!
+
+#### What's Documented
+
+**Complete Guide**: [docs/user-factors.md](docs/user-factors.md)
+- **Overview**: What user factors are (فاکتور - invoices/receipts)
+- **Architecture**: UserFactorManager and UserFactor components
+- **Database Schema**: Complete schema with indexes
+- **Usage Examples**: 25+ code examples for common scenarios
+- **Integration Patterns**: 4 ready-to-use patterns
+- **Best Practices**: 5 recommended practices
+- **Performance Guide**: Optimization tips and indexing strategies
+- **Troubleshooting**: Common issues and solutions
+- **API Reference**: Complete method documentation
+
+#### Key Topics Covered
+
+**What You Can Do**:
+- 📄 Generate formal invoices for purchases
+- 🧾 Store digital receipts for customer reference
+- 📊 Track all financial transactions per user
+- 💰 Maintain detailed financial records for reporting
+- 🔍 Enable customers to view purchase history
+- 📈 Analyze sales, discounts, and tax data
+- 🧮 Generate tax reports from stored data
+
+**Technical Features**:
+- JSONB storage for flexible product data
+- Financial tracking (discount, tax, amount paid)
+- Indexed queries for fast retrieval
+- User-centric factor lookup
+- Thread-safe operations
+- Extensible JSON structure
+- Sales and revenue analytics
+
+#### Integration Examples
+
+**Pattern 1**: Create Factor from Order
+```go
+func createFactorFromOrder(ctx context.Context, order UserOrder[int64]) error {
+    // Build products JSON from order items
+    // Calculate discount and tax
+    // Store factor in database
+}
+```
+
+**Pattern 2**: Generate PDF Invoice
+```go
+func generateInvoicePDF(ctx context.Context, factor UserFactor[int64]) ([]byte, error) {
+    // Get factor details
+    // Generate formatted invoice PDF
+}
+```
+
+**Pattern 3**: Sales Analytics
+```go
+func analyzeSalesData(ctx context.Context, userAccount UserAccount[int64]) error {
+    // Aggregate revenue, discounts, and tax
+    // Track product sales counts
+}
+```
+
+**Pattern 4**: Customer Purchase History
+```go
+func displayPurchaseHistory(ctx context.Context, userAccount UserAccount[int64]) error {
+    // Paginated factor retrieval
+    // Display invoice history
+}
+```
+
+#### Database Schema
+
+```sql
+CREATE TABLE factors (
+    id              BIGINT PRIMARY KEY,
+    user_id         BIGINT NOT NULL REFERENCES users(id),
+    products        JSONB NOT NULL,
+    discount        DOUBLE PRECISION NOT NULL DEFAULT 0,
+    tax             DOUBLE PRECISION NOT NULL DEFAULT 0,
+    amount_paid     DOUBLE PRECISION NOT NULL,
+    
+    INDEX idx_factors_user_id (user_id),
+    INDEX idx_factors_amount_paid (amount_paid)
+);
+```
+
+#### Products JSON Structure
+
+```json
+[
+    {
+        "product_id": 123,
+        "product_name": "Wireless Mouse",
+        "sku": "MOUSE-001",
+        "quantity": 2,
+        "unit_price": 29.99,
+        "subtotal": 59.98,
+        "attributes": {
+            "color": "black",
+            "warranty": "1 year"
+        }
+    }
+]
+```
+
+### API Reference
+
+**UserFactorManager Methods**:
+- `GetUserFactors(ctx, account, factors, skip, limit, order)` - Retrieve user's factors
+- `GetUserFactorCount(ctx, account)` - Count user's factors
+- `RemoveAllUserFactors(ctx)` - Delete all factors
+- `Init(ctx)` - Initialize database schema
+
+**UserFactor Methods**:
+- `GetProducts(ctx)` / `SetProducts(ctx, products)` - Manage products JSON
+- `GetDiscount(ctx)` / `SetDiscount(ctx, discount)` - Manage discount
+- `GetTax(ctx)` / `SetTax(ctx, tax)` - Manage tax
+- `GetAmountPaid(ctx)` / `SetAmountPaid(ctx, amount)` - Manage amount paid
+
+### Files Added
+
+- `docs/user-factors.md` - Complete documentation (715 lines)
+- `README.md` - Updated with user factors link
+
+---
+
+## [Previous] - Product Subscriptions & Payment Improvements
 
 ### 🎉 New Feature: Product Item Subscriptions
 

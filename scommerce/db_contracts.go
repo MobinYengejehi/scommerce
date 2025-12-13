@@ -28,6 +28,8 @@ type DBApplication[AccountID comparable] interface {
 	DBProductItem[AccountID]
 	DBProductItemSubscriptionManager[AccountID]
 	DBProductItemSubscription[AccountID]
+	DBUserFactorManager[AccountID]
+	DBUserFactor[AccountID]
 	DBCountryManager
 	DBCountry
 	DBPaymentTypeManager
@@ -83,6 +85,8 @@ type DBUserAccount[AccountID comparable] interface {
 	GetUserAccountSubscriptionCount(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (uint64, error)
 	RemoveUserAccountSubscription(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID, subscriptionID uint64) error
 	RemoveAllUserAccountSubscriptions(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) error
+	GetUserAccountUserFactors(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID, ids []uint64, factorForms []*UserFactorForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]uint64, []*UserFactorForm[AccountID], error)
+	GetUserAccountUserFactorCount(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (uint64, error)
 	HasUserAccountPenalty(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (bool, error)
 	IsUserAccountActive(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (bool, error)
 	IsUserAccountBanned(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (string, error)
@@ -454,4 +458,23 @@ type DBProductItemSubscription[AccountID comparable] interface {
 	IsProductItemSubscriptionActive(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64) (bool, error)
 	SetProductItemSubscriptionActive(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64, isActive bool) error
 	CancelProductItemSubscription(ctx context.Context, form *ProductItemSubscriptionForm[AccountID], subscriptionID uint64) error
+}
+
+type DBUserFactorManager[AccountID comparable] interface {
+	InitUserFactorManager(ctx context.Context) error
+	GetUserFactorCount(ctx context.Context, aid AccountID) (uint64, error)
+	GetUserFactors(ctx context.Context, aid AccountID, ids []uint64, factorForms []*UserFactorForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]uint64, []*UserFactorForm[AccountID], error)
+	RemoveAllUserFactors(ctx context.Context) error
+	RemoveUserAccountFactors(ctx context.Context, aid AccountID) error
+}
+
+type DBUserFactor[AccountID comparable] interface {
+	GetUserFactorProducts(ctx context.Context, form *UserFactorForm[AccountID], fid uint64) (json.RawMessage, error)
+	SetUserFactorProducts(ctx context.Context, form *UserFactorForm[AccountID], fid uint64, products json.RawMessage) error
+	GetUserFactorDiscount(ctx context.Context, form *UserFactorForm[AccountID], fid uint64) (float64, error)
+	SetUserFactorDiscount(ctx context.Context, form *UserFactorForm[AccountID], fid uint64, discount float64) error
+	GetUserFactorTax(ctx context.Context, form *UserFactorForm[AccountID], fid uint64) (float64, error)
+	SetUserFactorTax(ctx context.Context, form *UserFactorForm[AccountID], fid uint64, tax float64) error
+	GetUserFactorAmountPaid(ctx context.Context, form *UserFactorForm[AccountID], fid uint64) (float64, error)
+	SetUserFactorAmountPaid(ctx context.Context, form *UserFactorForm[AccountID], fid uint64, amountPaid float64) error
 }

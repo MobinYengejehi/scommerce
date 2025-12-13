@@ -16,6 +16,7 @@ type userAccountDatabase[AccountID comparable] interface {
 	userOrderDatabase[AccountID]
 	userShoppingCartDatabase[AccountID]
 	productItemSubscriptionDatabase[AccountID]
+	userFactorDatabase[AccountID]
 	DBUserRole
 }
 
@@ -1907,6 +1908,81 @@ func (account *BuiltinUserAccount[AccountID]) RemoveAllSubscriptions(ctx context
 		return err
 	}
 	return nil
+}
+
+func (account *BuiltinUserAccount[AccountID]) newUserFactor(ctx context.Context, fid uint64, db userFactorDatabase[AccountID], form *UserFactorForm[AccountID]) (*BuiltinUserFactor[AccountID], error) {
+	aid, err := account.GetID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	factor := &BuiltinUserFactor[AccountID]{
+		UserFactorForm: UserFactorForm[AccountID]{
+			ID:            fid,
+			UserAccountID: aid,
+		},
+		DB: db,
+	}
+	if err := factor.Init(ctx); err != nil {
+		return nil, err
+	}
+	if form != nil {
+		if err := factor.ApplyFormObject(ctx, form); err != nil {
+			return nil, err
+		}
+	}
+	return factor, nil
+}
+
+func (account *BuiltinUserAccount[AccountID]) GetUserFactors(ctx context.Context, factors []UserFactor[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserFactor[AccountID], error) {
+	var err error = nil
+	id, err := account.GetID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	form, err := account.UserAccountForm.Clone(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]uint64, 0, GetSafeLimit(limit))
+	factorForms := make([]*UserFactorForm[AccountID], 0, cap(ids))
+	ids, factorForms, err = account.DB.GetUserAccountUserFactors(ctx, &form, id, ids, factorForms, skip, limit, queueOrder)
+	if err != nil {
+		return nil, err
+	}
+	if err := account.ApplyFormObject(ctx, &form); err != nil {
+		return nil, err
+	}
+	ftrs := factors
+	if ftrs == nil {
+		ftrs = make([]UserFactor[AccountID], 0, len(ids))
+	}
+	for i := range len(ids) {
+		factor, err := account.newUserFactor(ctx, ids[i], account.DB, factorForms[i])
+		if err != nil {
+			return nil, err
+		}
+		ftrs = append(ftrs, factor)
+	}
+	return ftrs, nil
+}
+
+func (account *BuiltinUserAccount[AccountID]) GetUserFactorCount(ctx context.Context) (uint64, error) {
+	id, err := account.GetID(ctx)
+	if err != nil {
+		return 0, err
+	}
+	form, err := account.UserAccountForm.Clone(ctx)
+	if err != nil {
+		return 0, err
+	}
+	count, err := account.DB.GetUserAccountUserFactorCount(ctx, &form, id)
+	if err != nil {
+		return 0, err
+	}
+	if err := account.ApplyFormObject(ctx, &form); err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 func (account *BuiltinUserAccount[AccountID]) ToBuiltinObject(ctx context.Context) (*BuiltinUserAccount[AccountID], error) {
