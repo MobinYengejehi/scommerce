@@ -449,6 +449,23 @@ type ProductItem[AccountID comparable] interface {
 	ApplyFormObject(ctx context.Context, form *ProductItemForm[AccountID]) error
 }
 
+type ProductItemSubscriptionManager[AccountID comparable] interface {
+}
+
+/*
+this product subscription structure looks like:
+
+	struct ProductSubscription[AccountID comparable] {
+		UserAccountID AccountID
+		ProductItem   ProductItem
+		Duration      time.Duration // 1 month for example or 6 month for example. like (time.Hour*24) * 30
+		Date          time.Time     // subscribed date time
+		Type          string        // subscription type for example 'private' or some other things like that which user will specify thats why its "string"
+	}
+*/
+type ProductItemSubscription[AccountID comparable] interface {
+}
+
 type CountryManager interface {
 	GeneralAppObject
 
