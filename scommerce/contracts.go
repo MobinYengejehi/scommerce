@@ -363,6 +363,24 @@ type UserShoppingCartItem[AccountID comparable] interface {
 	ApplyFormObject(ctx context.Context, form *UserShoppingCartItemForm[AccountID]) error
 }
 
+type UserFactorManager[AccountID comparable] interface {
+}
+
+/*
+this user factor structure must look like this:
+
+	struct UserFactor[AccountID comparable] {
+		UserAccountID AccountID
+		ID  uint64
+		Products json.RawMessage // this contains the list of items with 'id' and 'item display names' and its count and price
+		Discount   float64
+		Tax        float64
+		AmountPaid float64
+	}
+*/
+type UserFactor[AccountID comparable] interface {
+}
+
 type ProductManager[AccountID comparable] interface {
 	GeneralAppObject
 
