@@ -2,6 +2,7 @@ package scommerce
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 )
@@ -32,6 +33,7 @@ type BuiltinUserOrderManager[AccountID comparable] struct {
 type UserOrderProductItem[AccountID comparable] struct {
 	ProductItem *BuiltinProductItem[AccountID] `json:"product_item"`
 	Quantity    uint64                         `json:"quantity"`
+	Attributes  json.RawMessage                `json:"attributes,omitempty"`
 }
 
 type UserOrderForm[AccountID comparable] struct {
@@ -445,6 +447,7 @@ func (order *BuiltinUserOrder[AccountID]) GetProductItems(ctx context.Context, i
 		itms = append(itms, UserOrderProductItem[AccountID]{
 			ProductItem: productItem,
 			Quantity:    dbItem.Quantity,
+			Attributes:  dbItem.Attributes,
 		})
 	}
 	return itms, nil

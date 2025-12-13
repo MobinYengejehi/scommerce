@@ -9,12 +9,13 @@ S-Commerce is a comprehensive e-commerce library designed to help Go developers 
 ### Core E-Commerce Functionality
 - **User Management**: Complete account system with authentication, roles, profiles, and wallet management
 - **Product Catalog**: Hierarchical categories, products with variants, inventory tracking, and search
-- **Shopping Cart**: Session-based carts with multi-item support and seamless checkout
-- **Order Management**: Full order lifecycle from creation to delivery with status tracking
+- **Shopping Cart**: Session-based carts with multi-item support, **item-level attributes**, and seamless checkout
+- **Order Management**: Full order lifecycle from creation to delivery with status tracking and **attribute preservation**
 - **Payment Processing**: Multiple payment methods, expiry tracking, and default method management
 - **Shipping**: Configurable shipping methods with pricing
 - **Reviews & Ratings**: Customer reviews with rating aggregation
 - **Address Management**: Multiple addresses per user with default address support
+- **Item Customization**: Store user-specific customizations and metadata with cart and order items
 
 ### Technical Features
 - **Contract-Based Design**: All functionality defined through interfaces for maximum flexibility
@@ -75,8 +76,67 @@ A typical user registration and product browsing flow:
 3. **Create Account**: Call `AccountManager.NewAccount` with token, password, and OTP code
 4. **Browse Products**: Use `ProductManager.SearchForProducts` to find products
 5. **View Details**: Retrieve product items with pricing and inventory
-6. **Add to Cart**: Create a shopping cart and add items
+6. **Add to Cart**: Create a shopping cart and add items with custom attributes
 7. **Checkout**: Convert cart to order with payment method and shipping address
+8. **Retrieve Order**: Access order items with preserved customizations
+
+### Item Attributes & Customization
+
+**NEW FEATURE**: Shopping cart items and order items now support custom attributes!
+
+Store user-specific information such as:
+- Product customizations (engraving text, custom colors)
+- Gift wrapping preferences
+- Special delivery instructions per item
+- Variant selections (size, color, material)
+- Bundle configurations
+- Add-on selections
+
+```go
+import "encoding/json"
+
+// Define custom attributes for a cart item
+attrs := json.RawMessage(`{
+    "color": "blue",
+    "size": "large",
+    "engraving": "Happy Birthday!",
+    "gift_wrap": true,
+    "delivery_note": "Handle with care"
+}`)
+
+// Add item to cart with attributes
+cartItem, err := cart.NewShoppingCartItem(ctx, productItem, 2, attrs)
+if err != nil {
+    // handle error
+}
+
+// Retrieve attributes from cart item
+itemAttrs, err := cartItem.GetAttributes(ctx)
+// itemAttrs contains the JSON: {"color": "blue", "size": "large", ...}
+
+// Update attributes if needed
+newAttrs := json.RawMessage(`{"color": "red", "size": "large"}`)
+err = cartItem.SetAttributes(ctx, newAttrs)
+
+// When you order, attributes are automatically preserved
+order, err := cart.Order(ctx, paymentMethod, address, shippingMethod, "Please deliver by Friday")
+
+// Retrieve order items - attributes are preserved!
+orderItems, err := order.GetProductItems(ctx, nil, 0, 10, scommerce.QueueOrderAsc)
+for _, item := range orderItems {
+    fmt.Printf("Product ID: %d\n", item.ProductItem.ID)
+    fmt.Printf("Quantity: %d\n", item.Quantity)
+    fmt.Printf("Attributes: %s\n", string(item.Attributes))
+    // Attributes: {"color": "blue", "size": "large", "engraving": "Happy Birthday!", ...}
+}
+```
+
+**How it works:**
+1. Attributes are stored as JSONB in the database
+2. Cart items preserve attributes in `shopping_cart_items.attributes`
+3. When ordering, attributes automatically flow to `orders.product_items`
+4. Retrieve order items anytime with full attribute data
+5. Use `json.RawMessage` for maximum flexibility
 
 ## Architecture
 
@@ -143,6 +203,7 @@ S-Commerce follows a clean, layered architecture:
 |----------|-------------|
 | [Architecture](docs/architecture.md) | System design and component relationships |
 | [Getting Started](docs/getting-started.md) | Installation and first application |
+| [Item Attributes](docs/item-attributes.md) | **NEW!** Store customizations with cart and order items |
 | [Contracts](docs/contracts.md) | Complete interface reference |
 | [Database Integration](docs/database-integration.md) | Implementing database persistence |
 | [File Storage](docs/file-storage.md) | File storage system guide |

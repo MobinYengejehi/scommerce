@@ -2,6 +2,7 @@ package dbsamples
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
@@ -89,7 +90,8 @@ func (db *PostgreDatabase) GetUserShoppingCartItems(ctx context.Context, form *s
 					from product_items pi
 					where sci."product_item_id" = pi."id"
 					limit 1
-				), 0) as "dept"
+				), 0) as "dept",
+				coalesce("attributes", 'null'::jsonb) as "attributes"
 			from shopping_cart_items sci
 			where sci."cart_id" = $1
 			order by "id" `+queueOrder.String()+`
@@ -111,7 +113,8 @@ func (db *PostgreDatabase) GetUserShoppingCartItems(ctx context.Context, form *s
 		var productItemID uint64
 		var quantity int64
 		var dept float64
-		if err := rows.Scan(&id, &userID, &productItemID, &quantity, &dept); err != nil {
+		var attrs json.RawMessage
+		if err := rows.Scan(&id, &userID, &productItemID, &quantity, &dept, &attrs); err != nil {
 			return nil, nil, err
 		}
 
@@ -133,6 +136,7 @@ func (db *PostgreDatabase) GetUserShoppingCartItems(ctx context.Context, form *s
 			ProductItem:   item,
 			Quantity:      &quantity,
 			Dept:          &dept,
+			Attributes:    &attrs,
 			ShoppingCart: &scommerce.BuiltinUserShoppingCart[UserAccountID]{
 				DB:                 db,
 				FS:                 fs,
@@ -174,19 +178,20 @@ func (db *PostgreDatabase) GetUserShoppingCartSessionText(ctx context.Context, f
 	return "", nil
 }
 
-func (db *PostgreDatabase) NewUserShoppingCartShoppingCartItem(ctx context.Context, form *scommerce.UserShoppingCartForm[UserAccountID], sid uint64, productItem uint64, count int64, itemForm *scommerce.UserShoppingCartItemForm[UserAccountID], fs scommerce.FileStorage, osm scommerce.OrderStatusManager) (uint64, error) {
+func (db *PostgreDatabase) NewUserShoppingCartShoppingCartItem(ctx context.Context, form *scommerce.UserShoppingCartForm[UserAccountID], sid uint64, productItem uint64, count int64, attrs json.RawMessage, itemForm *scommerce.UserShoppingCartItemForm[UserAccountID], fs scommerce.FileStorage, osm scommerce.OrderStatusManager) (uint64, error) {
 	var id uint64
 	err := db.PgxPool.QueryRow(
 		ctx,
 		`
 			insert into
-				shopping_cart_items("cart_id", "product_item_id", "quantity")
-				values($1, $2, $3)
+				shopping_cart_items("cart_id", "product_item_id", "quantity", "attributes")
+				values($1, $2, $3, $4)
 				returning "id";
 		`,
 		sid,
 		productItem,
 		count,
+		attrs,
 	).Scan(&id)
 	if err != nil {
 		return 0, err
@@ -209,6 +214,7 @@ func (db *PostgreDatabase) NewUserShoppingCartShoppingCartItem(ctx context.Conte
 			},
 		}
 		itemForm.Quantity = &count
+		itemForm.Attributes = &attrs
 	}
 	return id, nil
 }
@@ -440,6 +446,7 @@ func (db *PostgreDatabase) InitUserShoppingCartManager(ctx context.Context) erro
 				cart_id         bigint not null references shopping_carts(id) on delete cascade,
 				product_item_id bigint not null references product_items(id),
 				quantity        bigint not null,
+				attributes      jsonb,
 				unique (cart_id, product_item_id)
 			);
 
@@ -475,7 +482,8 @@ func (db *PostgreDatabase) InitUserShoppingCartManager(ctx context.Context) erro
 				select jsonb_agg(
 					jsonb_build_object(
 						'product_item_id', sci.product_item_id,
-						'quantity', sci.quantity
+						'quantity', sci.quantity,
+						'attributes', coalesce(sci.attributes, 'null'::jsonb)
 					)
 				), count(*)
 				into v_product_items, v_count

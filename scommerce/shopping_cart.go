@@ -2,6 +2,7 @@ package scommerce
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 )
 
@@ -302,7 +303,7 @@ func (shoppingCart *BuiltinUserShoppingCart[AccountID]) Init(ctx context.Context
 	return nil
 }
 
-func (shoppingCart *BuiltinUserShoppingCart[AccountID]) NewShoppingCartItem(ctx context.Context, item ProductItem[AccountID], count int64) (UserShoppingCartItem[AccountID], error) {
+func (shoppingCart *BuiltinUserShoppingCart[AccountID]) NewShoppingCartItem(ctx context.Context, item ProductItem[AccountID], count int64, attrs json.RawMessage) (UserShoppingCartItem[AccountID], error) {
 	itid, err := item.GetID(ctx)
 	if err != nil {
 		return nil, err
@@ -316,7 +317,7 @@ func (shoppingCart *BuiltinUserShoppingCart[AccountID]) NewShoppingCartItem(ctx 
 		return nil, err
 	}
 	itemForm := UserShoppingCartItemForm[AccountID]{}
-	sitid, err := shoppingCart.DB.NewUserShoppingCartShoppingCartItem(ctx, &form, id, itid, count, &itemForm, shoppingCart.FS, shoppingCart.OrderStatusManager)
+	sitid, err := shoppingCart.DB.NewUserShoppingCartShoppingCartItem(ctx, &form, id, itid, count, attrs, &itemForm, shoppingCart.FS, shoppingCart.OrderStatusManager)
 	if err != nil {
 		return nil, err
 	}

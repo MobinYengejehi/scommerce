@@ -128,7 +128,7 @@ type DBUserShoppingCart[AccountID comparable] interface {
 	GetUserShoppingCartSessionText(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64) (string, error)
 	GetUserShoppingCartItemCount(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64) (uint64, error)
 	GetUserShoppingCartItems(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64, items []uint64, itemForms []*UserShoppingCartItemForm[AccountID], skip int64, limit int64, queueOrder QueueOrder, fs FileStorage, osm OrderStatusManager) ([]uint64, []*UserShoppingCartItemForm[AccountID], error)
-	NewUserShoppingCartShoppingCartItem(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64, productItem uint64, count int64, itemForm *UserShoppingCartItemForm[AccountID], fs FileStorage, osm OrderStatusManager) (uint64, error)
+	NewUserShoppingCartShoppingCartItem(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64, productItem uint64, count int64, attrs json.RawMessage, itemForm *UserShoppingCartItemForm[AccountID], fs FileStorage, osm OrderStatusManager) (uint64, error)
 	OrderUserShoppingCart(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64, paymentMethod uint64, address uint64, shippingMethod uint64, userComment string, orderForm *UserOrderForm[AccountID]) (uint64, error)
 	RemoveUserShoppingCartAllShoppingCartItems(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64) error
 	RemoveUserShoppingCartShoppingCartItem(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64, itid uint64) error
@@ -142,6 +142,8 @@ type DBUserShoppingCartItem[AccountID comparable] interface {
 	GetUserShoppingCartItemQuantity(ctx context.Context, form *UserShoppingCartItemForm[AccountID], itid uint64) (int64, error)
 	GetUserShoppingCartItemShoppingCart(ctx context.Context, form *UserShoppingCartItemForm[AccountID], itid uint64, cartForm *UserShoppingCartForm[AccountID], db FileStorage, osm OrderStatusManager) (uint64, error)
 	SetUserShoppingCartItemQuantity(ctx context.Context, form *UserShoppingCartItemForm[AccountID], itid uint64, quantity int64) error
+	GetUserShoppingCartItemAttributes(ctx context.Context, form *UserShoppingCartItemForm[AccountID], itid uint64) (json.RawMessage, error)
+	SetUserShoppingCartItemAttributes(ctx context.Context, form *UserShoppingCartItemForm[AccountID], itid uint64, attrs json.RawMessage) error
 }
 
 type DBUserOrderResult[AccountID comparable] struct {
@@ -157,8 +159,9 @@ type DBUserOrderManager[AccountID comparable] interface {
 }
 
 type DBUserOrderProductItem struct {
-	ProductItemID uint64 `json:"product_item_id"`
-	Quantity      uint64 `json:"quantity"`
+	ProductItemID uint64          `json:"product_item_id"`
+	Quantity      uint64          `json:"quantity"`
+	Attributes    json.RawMessage `json:"attributes,omitempty"`
 }
 type DBUserOrder[AccountID comparable] interface {
 	CalculateUserOrderTotalPrice(ctx context.Context, form *UserOrderForm[AccountID], oid uint64) (float64, error)

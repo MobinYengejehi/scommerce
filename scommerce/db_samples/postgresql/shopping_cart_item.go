@@ -2,6 +2,7 @@ package dbsamples
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
 )
@@ -127,6 +128,38 @@ func (db *PostgreDatabase) SetUserShoppingCartItemQuantity(ctx context.Context, 
 	}
 	if form != nil {
 		form.Quantity = &quantity
+	}
+	return nil
+}
+
+func (db *PostgreDatabase) GetUserShoppingCartItemAttributes(ctx context.Context, form *scommerce.UserShoppingCartItemForm[UserAccountID], itid uint64) (json.RawMessage, error) {
+	var attrs json.RawMessage
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`select coalesce("attributes", 'null'::jsonb) from shopping_cart_items where "id" = $1 limit 1`,
+		itid,
+	).Scan(&attrs)
+	if err != nil {
+		return nil, err
+	}
+	if form != nil {
+		form.Attributes = &attrs
+	}
+	return attrs, nil
+}
+
+func (db *PostgreDatabase) SetUserShoppingCartItemAttributes(ctx context.Context, form *scommerce.UserShoppingCartItemForm[UserAccountID], itid uint64, attrs json.RawMessage) error {
+	_, err := db.PgxPool.Exec(
+		ctx,
+		`update shopping_cart_items set "attributes" = $1 where "id" = $2`,
+		attrs,
+		itid,
+	)
+	if err != nil {
+		return err
+	}
+	if form != nil {
+		form.Attributes = &attrs
 	}
 	return nil
 }

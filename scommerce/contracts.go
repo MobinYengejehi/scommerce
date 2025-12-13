@@ -319,7 +319,7 @@ type UserShoppingCart[AccountID comparable] interface {
 	GetSessionText(ctx context.Context) (string, error)
 	SetSessionText(ctx context.Context, sessionText string) error
 
-	NewShoppingCartItem(ctx context.Context, item ProductItem[AccountID], count int64) (UserShoppingCartItem[AccountID], error)
+	NewShoppingCartItem(ctx context.Context, item ProductItem[AccountID], count int64, attrs json.RawMessage) (UserShoppingCartItem[AccountID], error)
 	RemoveShoppingCartItem(ctx context.Context, item UserShoppingCartItem[AccountID]) error
 	RemoveAllShoppingCartItems(ctx context.Context) error
 	GetShoppingCartItems(ctx context.Context, items []UserShoppingCartItem[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserShoppingCartItem[AccountID], error)
@@ -346,6 +346,9 @@ type UserShoppingCartItem[AccountID comparable] interface {
 	GetQuantity(ctx context.Context) (int64, error)
 	SetQuantity(ctx context.Context, quantity int64) error
 	AddQuantity(ctx context.Context, delta int64) error
+
+	GetAttributes(ctx context.Context) (json.RawMessage, error)
+	SetAttributes(ctx context.Context, attrs json.RawMessage) error
 
 	CalculateDept(ctx context.Context) (float64, error)
 

@@ -239,7 +239,8 @@ func (db *PostgreDatabase) GetUserOrderProductItems(ctx context.Context, form *s
 		`
 			select
 				(item->>'product_item_id')::bigint as product_item_id,
-				(item->>'quantity')::bigint as quantity
+				(item->>'quantity')::bigint as quantity,
+				coalesce(item->'attributes', 'null'::jsonb) as attributes
 			from orders o
 			cross join lateral jsonb_array_elements(o.product_items) as item
 			where o.id = $1
@@ -259,13 +260,15 @@ func (db *PostgreDatabase) GetUserOrderProductItems(ctx context.Context, form *s
 	for rows.Next() {
 		var productItemID uint64
 		var quantity uint64
-		if err := rows.Scan(&productItemID, &quantity); err != nil {
+		var attrs json.RawMessage
+		if err := rows.Scan(&productItemID, &quantity, &attrs); err != nil {
 			return nil, err
 		}
 
 		itms = append(itms, scommerce.DBUserOrderProductItem{
 			ProductItemID: productItemID,
 			Quantity:      quantity,
+			Attributes:    attrs,
 		})
 	}
 

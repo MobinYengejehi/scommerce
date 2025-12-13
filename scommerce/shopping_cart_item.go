@@ -2,6 +2,7 @@ package scommerce
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 )
 
@@ -20,6 +21,7 @@ type UserShoppingCartItemForm[AccountID comparable] struct {
 	ProductItem   *BuiltinProductItem[AccountID]      `json:"product_item,omitempty"`
 	Quantity      *int64                              `json:"quantity,omitempty"`
 	ShoppingCart  *BuiltinUserShoppingCart[AccountID] `json:"shopping_cart,omitempty"`
+	Attributes    *json.RawMessage                    `json:"attributes,omitempty"`
 }
 
 type BuiltinUserShoppingCartItem[AccountID comparable] struct {
@@ -259,6 +261,55 @@ func (item *BuiltinUserShoppingCartItem[AccountID]) SetQuantity(ctx context.Cont
 	return nil
 }
 
+func (item *BuiltinUserShoppingCartItem[AccountID]) GetAttributes(ctx context.Context) (json.RawMessage, error) {
+	item.MU.RLock()
+	if item.Attributes != nil {
+		defer item.MU.RUnlock()
+		return *item.Attributes, nil
+	}
+	item.MU.RUnlock()
+	id, err := item.GetID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	form, err := item.UserShoppingCartItemForm.Clone(ctx)
+	if err != nil {
+		return nil, err
+	}
+	attrs, err := item.DB.GetUserShoppingCartItemAttributes(ctx, &form, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := item.ApplyFormObject(ctx, &form); err != nil {
+		return nil, err
+	}
+	item.MU.Lock()
+	defer item.MU.Unlock()
+	item.Attributes = &attrs
+	return attrs, nil
+}
+
+func (item *BuiltinUserShoppingCartItem[AccountID]) SetAttributes(ctx context.Context, attrs json.RawMessage) error {
+	id, err := item.GetID(ctx)
+	if err != nil {
+		return err
+	}
+	form, err := item.UserShoppingCartItemForm.Clone(ctx)
+	if err != nil {
+		return err
+	}
+	if err := item.DB.SetUserShoppingCartItemAttributes(ctx, &form, id, attrs); err != nil {
+		return err
+	}
+	if err := item.ApplyFormObject(ctx, &form); err != nil {
+		return err
+	}
+	item.MU.Lock()
+	defer item.MU.Unlock()
+	item.Attributes = &attrs
+	return nil
+}
+
 func (item *BuiltinUserShoppingCartItem[AccountID]) ToBuiltinObject(ctx context.Context) (*BuiltinUserShoppingCartItem[AccountID], error) {
 	return item, nil
 }
@@ -292,6 +343,9 @@ func (item *BuiltinUserShoppingCartItem[AccountID]) ApplyFormObject(ctx context.
 	}
 	if form.ShoppingCart != nil {
 		item.ShoppingCart = form.ShoppingCart
+	}
+	if form.Attributes != nil {
+		item.Attributes = form.Attributes
 	}
 	return nil
 }
