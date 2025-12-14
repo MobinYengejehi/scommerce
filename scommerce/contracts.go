@@ -691,3 +691,20 @@ type UserReview[AccountID comparable] interface {
 	ToFormObject(ctx context.Context) (*UserReviewForm[AccountID], error)
 	ApplyFormObject(ctx context.Context, form *UserReviewForm[AccountID]) error
 }
+
+type UserDiscountManager[AccountID comparable] interface {
+}
+
+/*
+this is how discount structure should look like:
+
+	struct UserDiscount[AccountID comparable] {
+		UserAccountID AccountID
+		ID uint64
+		Code string // it can be everything with characters or numbers like "vf93100f". if we take a look at OTP and see how it generates the code this is also something like that
+		Value float64 // price affects on shopping_cart total price
+		ValidCount int64 // valid count of this discount which means how many time users can use this and also if a user already used this discount his not able to use it again
+	}
+*/
+type UserDiscount[AccountID comparable] interface {
+}
