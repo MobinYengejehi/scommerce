@@ -147,6 +147,13 @@ type UserAccount[AccountID comparable] interface {
 	GetUserFactors(ctx context.Context, factors []UserFactor[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserFactor[AccountID], error)
 	GetUserFactorCount(ctx context.Context) (uint64, error)
 
+	// Discounts
+	NewDiscount(ctx context.Context, value float64, validCount int64) (UserDiscount[AccountID], error)
+	RemoveDiscount(ctx context.Context, discount UserDiscount[AccountID]) error
+	RemoveAllDiscounts(ctx context.Context) error
+	GetDiscounts(ctx context.Context, discounts []UserDiscount[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserDiscount[AccountID], error)
+	GetDiscountCount(ctx context.Context) (uint64, error)
+
 	// Tickets
 
 	ToBuiltinObject(ctx context.Context) (*BuiltinUserAccount[AccountID], error)
@@ -337,7 +344,7 @@ type UserShoppingCart[AccountID comparable] interface {
 
 	CalculateDept(ctx context.Context, shippingMethod ShippingMethod) (float64, error)
 
-	Order(ctx context.Context, paymentMethod UserPaymentMethod[AccountID], address UserAddress[AccountID], shippingMethod ShippingMethod, userComment string) (UserOrder[AccountID], error)
+	Order(ctx context.Context, paymentMethod UserPaymentMethod[AccountID], address UserAddress[AccountID], shippingMethod ShippingMethod, userComment string, discountCode string) (UserOrder[AccountID], error)
 
 	ToBuiltinObject(ctx context.Context) (*BuiltinUserShoppingCart[AccountID], error)
 	ToFormObject(ctx context.Context) (*UserShoppingCartForm[AccountID], error)
@@ -693,18 +700,40 @@ type UserReview[AccountID comparable] interface {
 }
 
 type UserDiscountManager[AccountID comparable] interface {
+	GeneralAppObject
+
+	NewUserDiscount(ctx context.Context, ownerAccount UserAccount[AccountID], value float64, validCount int64) (UserDiscount[AccountID], error)
+	RemoveUserDiscount(ctx context.Context, discount UserDiscount[AccountID]) error
+	RemoveAllUserDiscounts(ctx context.Context) error
+	GetUserDiscounts(ctx context.Context, discounts []UserDiscount[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserDiscount[AccountID], error)
+	GetUserDiscountCount(ctx context.Context) (uint64, error)
+	GetUserDiscountByCode(ctx context.Context, code string) (UserDiscount[AccountID], error)
+	ExistsUserDiscountCode(ctx context.Context, code string) (bool, error)
+
+	ToBuiltinObject(ctx context.Context) (*BuiltinUserDiscountManager[AccountID], error)
 }
 
-/*
-this is how discount structure should look like:
-
-	struct UserDiscount[AccountID comparable] {
-		UserAccountID AccountID
-		ID uint64
-		Code string // it can be everything with characters or numbers like "vf93100f". if we take a look at OTP and see how it generates the code this is also something like that
-		Value float64 // price affects on shopping_cart total price
-		ValidCount int64 // valid count of this discount which means how many time users can use this and also if a user already used this discount his not able to use it again
-	}
-*/
 type UserDiscount[AccountID comparable] interface {
+	GeneralAppObject
+
+	GetID(ctx context.Context) (uint64, error)
+	GetUserAccountID(ctx context.Context) (AccountID, error)
+
+	GetCode(ctx context.Context) (string, error)
+	SetCode(ctx context.Context, code string) error
+
+	GetValue(ctx context.Context) (float64, error)
+	SetValue(ctx context.Context, value float64) error
+
+	GetValidCount(ctx context.Context) (int64, error)
+	SetValidCount(ctx context.Context, validCount int64) error
+	DecrementValidCount(ctx context.Context) error
+
+	GetUsedBy(ctx context.Context) ([]AccountID, error)
+	HasUserUsed(ctx context.Context, account UserAccount[AccountID]) (bool, error)
+	MarkAsUsedBy(ctx context.Context, account UserAccount[AccountID]) error
+
+	ToBuiltinObject(ctx context.Context) (*BuiltinUserDiscount[AccountID], error)
+	ToFormObject(ctx context.Context) (*UserDiscountForm[AccountID], error)
+	ApplyFormObject(ctx context.Context, form *UserDiscountForm[AccountID]) error
 }

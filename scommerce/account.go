@@ -17,6 +17,7 @@ type userAccountDatabase[AccountID comparable] interface {
 	userShoppingCartDatabase[AccountID]
 	productItemSubscriptionDatabase[AccountID]
 	userFactorDatabase[AccountID]
+	userDiscountDatabase[AccountID]
 	DBUserRole
 }
 
@@ -1933,6 +1934,25 @@ func (account *BuiltinUserAccount[AccountID]) newUserFactor(ctx context.Context,
 	return factor, nil
 }
 
+func (account *BuiltinUserAccount[AccountID]) newUserDiscount(ctx context.Context, did uint64, aid AccountID, db userDiscountDatabase[AccountID], form *UserDiscountForm[AccountID]) (*BuiltinUserDiscount[AccountID], error) {
+	discount := &BuiltinUserDiscount[AccountID]{
+		UserDiscountForm: UserDiscountForm[AccountID]{
+			ID:            did,
+			UserAccountID: aid,
+		},
+		DB: db,
+	}
+	if err := discount.Init(ctx); err != nil {
+		return nil, err
+	}
+	if form != nil {
+		if err := discount.ApplyFormObject(ctx, form); err != nil {
+			return nil, err
+		}
+	}
+	return discount, nil
+}
+
 func (account *BuiltinUserAccount[AccountID]) GetUserFactors(ctx context.Context, factors []UserFactor[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserFactor[AccountID], error) {
 	var err error = nil
 	id, err := account.GetID(ctx)
@@ -1976,6 +1996,117 @@ func (account *BuiltinUserAccount[AccountID]) GetUserFactorCount(ctx context.Con
 		return 0, err
 	}
 	count, err := account.DB.GetUserAccountUserFactorCount(ctx, &form, id)
+	if err != nil {
+		return 0, err
+	}
+	if err := account.ApplyFormObject(ctx, &form); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (account *BuiltinUserAccount[AccountID]) NewDiscount(ctx context.Context, value float64, validCount int64) (UserDiscount[AccountID], error) {
+	id, err := account.GetID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	form, err := account.UserAccountForm.Clone(ctx)
+	if err != nil {
+		return nil, err
+	}
+	discountForm := UserDiscountForm[AccountID]{}
+	did, err := account.DB.NewUserAccountDiscount(ctx, &form, id, value, validCount, &discountForm)
+	if err != nil {
+		return nil, err
+	}
+	if err := account.ApplyFormObject(ctx, &form); err != nil {
+		return nil, err
+	}
+	return account.newUserDiscount(ctx, did, id, account.DB, &discountForm)
+}
+
+func (account *BuiltinUserAccount[AccountID]) RemoveDiscount(ctx context.Context, discount UserDiscount[AccountID]) error {
+	id, err := account.GetID(ctx)
+	if err != nil {
+		return err
+	}
+	did, err := discount.GetID(ctx)
+	if err != nil {
+		return err
+	}
+	form, err := account.UserAccountForm.Clone(ctx)
+	if err != nil {
+		return err
+	}
+	if err := account.DB.RemoveUserAccountDiscount(ctx, &form, id, did); err != nil {
+		return err
+	}
+	if err := account.ApplyFormObject(ctx, &form); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (account *BuiltinUserAccount[AccountID]) RemoveAllDiscounts(ctx context.Context) error {
+	id, err := account.GetID(ctx)
+	if err != nil {
+		return err
+	}
+	form, err := account.UserAccountForm.Clone(ctx)
+	if err != nil {
+		return err
+	}
+	if err := account.DB.RemoveAllUserAccountDiscounts(ctx, &form, id); err != nil {
+		return err
+	}
+	if err := account.ApplyFormObject(ctx, &form); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (account *BuiltinUserAccount[AccountID]) GetDiscounts(ctx context.Context, discounts []UserDiscount[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserDiscount[AccountID], error) {
+	id, err := account.GetID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	form, err := account.UserAccountForm.Clone(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]uint64, 0, GetSafeLimit(limit))
+	discountForms := make([]*UserDiscountForm[AccountID], 0, cap(ids))
+	ids, discountForms, err = account.DB.GetUserAccountDiscounts(ctx, &form, id, ids, discountForms, skip, limit, queueOrder)
+	if err != nil {
+		return nil, err
+	}
+	if err := account.ApplyFormObject(ctx, &form); err != nil {
+		return nil, err
+	}
+	discs := discounts
+	if discs == nil {
+		discs = make([]UserDiscount[AccountID], 0, len(ids))
+	}
+	for i := range len(ids) {
+		discount, err := account.newUserDiscount(ctx, ids[i], id, account.DB, discountForms[i])
+		if err != nil {
+			return nil, err
+		}
+		discs = append(discs, discount)
+	}
+	return discs, nil
+}
+
+func (account *BuiltinUserAccount[AccountID]) GetDiscountCount(ctx context.Context) (uint64, error) {
+	id, err := account.GetID(ctx)
+	if err != nil {
+		return 0, err
+	}
+	form, err := account.UserAccountForm.Clone(ctx)
+	if err != nil {
+		return 0, err
+	}
+	count, err := account.DB.GetUserAccountDiscountCount(ctx, &form, id)
 	if err != nil {
 		return 0, err
 	}

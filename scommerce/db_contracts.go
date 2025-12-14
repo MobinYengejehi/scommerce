@@ -30,6 +30,8 @@ type DBApplication[AccountID comparable] interface {
 	DBProductItemSubscription[AccountID]
 	DBUserFactorManager[AccountID]
 	DBUserFactor[AccountID]
+	DBUserDiscountManager[AccountID]
+	DBUserDiscount[AccountID]
 	DBCountryManager
 	DBCountry
 	DBPaymentTypeManager
@@ -87,6 +89,11 @@ type DBUserAccount[AccountID comparable] interface {
 	RemoveAllUserAccountSubscriptions(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) error
 	GetUserAccountUserFactors(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID, ids []uint64, factorForms []*UserFactorForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]uint64, []*UserFactorForm[AccountID], error)
 	GetUserAccountUserFactorCount(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (uint64, error)
+	NewUserAccountDiscount(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID, value float64, validCount int64, discountForm *UserDiscountForm[AccountID]) (uint64, error)
+	RemoveUserAccountDiscount(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID, discountID uint64) error
+	RemoveAllUserAccountDiscounts(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) error
+	GetUserAccountDiscounts(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID, ids []uint64, discountForms []*UserDiscountForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]uint64, []*UserDiscountForm[AccountID], error)
+	GetUserAccountDiscountCount(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (uint64, error)
 	HasUserAccountPenalty(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (bool, error)
 	IsUserAccountActive(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (bool, error)
 	IsUserAccountBanned(ctx context.Context, form *UserAccountForm[AccountID], aid AccountID) (string, error)
@@ -139,7 +146,7 @@ type DBUserShoppingCart[AccountID comparable] interface {
 	GetUserShoppingCartItemCount(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64) (uint64, error)
 	GetUserShoppingCartItems(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64, items []uint64, itemForms []*UserShoppingCartItemForm[AccountID], skip int64, limit int64, queueOrder QueueOrder, fs FileStorage, osm OrderStatusManager) ([]uint64, []*UserShoppingCartItemForm[AccountID], error)
 	NewUserShoppingCartShoppingCartItem(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64, productItem uint64, count int64, attrs json.RawMessage, itemForm *UserShoppingCartItemForm[AccountID], fs FileStorage, osm OrderStatusManager) (uint64, error)
-	OrderUserShoppingCart(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64, paymentMethod uint64, address uint64, shippingMethod uint64, userComment string, orderForm *UserOrderForm[AccountID]) (uint64, error)
+	OrderUserShoppingCart(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64, paymentMethod uint64, address uint64, shippingMethod uint64, userComment string, discountCode string, orderForm *UserOrderForm[AccountID]) (uint64, error)
 	RemoveUserShoppingCartAllShoppingCartItems(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64) error
 	RemoveUserShoppingCartShoppingCartItem(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64, itid uint64) error
 	SetUserShoppingCartSessionText(ctx context.Context, form *UserShoppingCartForm[AccountID], sid uint64, text string) error
@@ -477,4 +484,34 @@ type DBUserFactor[AccountID comparable] interface {
 	SetUserFactorTax(ctx context.Context, form *UserFactorForm[AccountID], fid uint64, tax float64) error
 	GetUserFactorAmountPaid(ctx context.Context, form *UserFactorForm[AccountID], fid uint64) (float64, error)
 	SetUserFactorAmountPaid(ctx context.Context, form *UserFactorForm[AccountID], fid uint64, amountPaid float64) error
+}
+
+type DBUserDiscountResult[AccountID comparable] struct {
+	ID  uint64
+	AID AccountID
+}
+
+type DBUserDiscountManager[AccountID comparable] interface {
+	InitUserDiscountManager(ctx context.Context) error
+	NewUserDiscount(ctx context.Context, ownerAccountID AccountID, value float64, validCount int64, discountForm *UserDiscountForm[AccountID]) (uint64, error)
+	RemoveUserDiscount(ctx context.Context, discountID uint64) error
+	RemoveAllUserDiscounts(ctx context.Context) error
+	GetUserDiscountCount(ctx context.Context) (uint64, error)
+	GetUserDiscounts(ctx context.Context, ids []DBUserDiscountResult[AccountID], discountForms []*UserDiscountForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]DBUserDiscountResult[AccountID], []*UserDiscountForm[AccountID], error)
+	GetUserDiscountByCode(ctx context.Context, code string, discountForm *UserDiscountForm[AccountID]) (DBUserDiscountResult[AccountID], error)
+	ExistsUserDiscountCode(ctx context.Context, code string) (bool, error)
+	GetUserDiscountsForAccount(ctx context.Context, ownerAccountID AccountID, ids []uint64, discountForms []*UserDiscountForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]uint64, []*UserDiscountForm[AccountID], error)
+}
+
+type DBUserDiscount[AccountID comparable] interface {
+	GetUserDiscountCode(ctx context.Context, form *UserDiscountForm[AccountID], discountID uint64) (string, error)
+	SetUserDiscountCode(ctx context.Context, form *UserDiscountForm[AccountID], discountID uint64, code string) error
+	GetUserDiscountValue(ctx context.Context, form *UserDiscountForm[AccountID], discountID uint64) (float64, error)
+	SetUserDiscountValue(ctx context.Context, form *UserDiscountForm[AccountID], discountID uint64, value float64) error
+	GetUserDiscountValidCount(ctx context.Context, form *UserDiscountForm[AccountID], discountID uint64) (int64, error)
+	SetUserDiscountValidCount(ctx context.Context, form *UserDiscountForm[AccountID], discountID uint64, validCount int64) error
+	DecrementUserDiscountValidCount(ctx context.Context, form *UserDiscountForm[AccountID], discountID uint64) error
+	GetUserDiscountUsedBy(ctx context.Context, form *UserDiscountForm[AccountID], discountID uint64) ([]AccountID, error)
+	AddUserDiscountUsedBy(ctx context.Context, form *UserDiscountForm[AccountID], discountID uint64, accountID AccountID) error
+	HasUserUsedDiscount(ctx context.Context, form *UserDiscountForm[AccountID], discountID uint64, accountID AccountID) (bool, error)
 }

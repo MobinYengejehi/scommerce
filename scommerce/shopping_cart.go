@@ -359,7 +359,7 @@ func (shoppingCart *BuiltinUserShoppingCart[AccountID]) newOrder(ctx context.Con
 	return order, nil
 }
 
-func (shoppingCart *BuiltinUserShoppingCart[AccountID]) Order(ctx context.Context, paymentMethod UserPaymentMethod[AccountID], address UserAddress[AccountID], shippingMethod ShippingMethod, userComment string) (UserOrder[AccountID], error) {
+func (shoppingCart *BuiltinUserShoppingCart[AccountID]) Order(ctx context.Context, paymentMethod UserPaymentMethod[AccountID], address UserAddress[AccountID], shippingMethod ShippingMethod, userComment string, discountCode string) (UserOrder[AccountID], error) {
 	pid, err := paymentMethod.GetID(ctx)
 	if err != nil {
 		return nil, err
@@ -381,7 +381,7 @@ func (shoppingCart *BuiltinUserShoppingCart[AccountID]) Order(ctx context.Contex
 		return nil, err
 	}
 	orderForm := UserOrderForm[AccountID]{}
-	oid, err := shoppingCart.DB.OrderUserShoppingCart(ctx, &form, id, pid, aid, sid, userComment, &orderForm)
+	oid, err := shoppingCart.DB.OrderUserShoppingCart(ctx, &form, id, pid, aid, sid, userComment, discountCode, &orderForm)
 	if err != nil {
 		return nil, err
 	}

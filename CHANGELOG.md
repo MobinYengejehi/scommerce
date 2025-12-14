@@ -1,6 +1,75 @@
 # Changelog
 
-## [Latest] - User Factor Documentation
+## [Latest] - User Discount System Documentation
+
+### 📚 Documentation: User Discounts (Promotional Codes)
+
+Comprehensive documentation added for the User Discount system!
+
+#### What's Documented
+
+**Complete Guide**: [docs/user-discounts.md](docs/user-discounts.md)
+- **Overview**: Promotional code and discount management
+- **Architecture**: UserDiscountManager and UserDiscount components  
+- **Database Schema**: Complete schema with unique code indexing
+- **Usage Examples**: 30+ code examples for real-world scenarios
+- **Integration Patterns**: 5 ready-to-use patterns
+- **Best Practices**: 5 recommended practices
+- **API Reference**: Complete method documentation
+
+#### Key Features
+
+**Discount Capabilities**:
+- 💳 Auto-generated unique discount codes
+- 🎁 Configurable usage limits (single-use, multi-use, unlimited)
+- 🎯 Usage tracking (who used each code)
+- 📊 Prevent duplicate redemptions
+- 🔒 Thread-safe code generation
+- ✅ Flexible discount values
+
+**Use Cases**:
+- Referral programs
+- Influencer campaigns  
+- Flash sales
+- Email marketing codes
+- Loyalty rewards
+- Seasonal promotions
+
+#### Integration Examples
+
+1. **Referral Program**: Generate unique codes for users to share
+2. **Influencer Campaign**: Create high-limit codes for influencers
+3. **Flash Sale**: Limited-use, high-value discount codes
+4. **Email Campaigns**: Personalized codes for each customer
+5. **Loyalty Tiers**: Different discount values based on customer tier
+
+#### API Highlights
+
+**Manager Methods**:
+- `NewUserDiscount(ctx, owner, value, validCount)` - Create discount with auto-generated code
+- `GetUserDiscountByCode(ctx, code)` - Retrieve discount by redemption code
+- `ExistsUserDiscountCode(ctx, code)` - Check if code exists
+
+**Discount Methods**:
+- `GetCode(ctx)` / `SetCode(ctx, code)` - Manage discount code
+- `GetValue(ctx)` / `SetValue(ctx, value)` - Manage discount amount
+- `GetValidCount(ctx)` / `DecrementValidCount(ctx)` - Track remaining uses
+- `HasUserUsed(ctx, account)` - Check if user already redeemed
+- `MarkAsUsedBy(ctx, account)` - Mark code as used
+
+**Account Integration**:
+- `account.NewDiscount(ctx, value, validCount)` - User creates own discount
+- `account.GetDiscounts(ctx, ...)` - List user's discounts
+- `account.GetDiscountCount(ctx)` - Count user's discounts
+
+### Files Added
+
+- `docs/user-discounts.md` - Complete documentation (898 lines)
+- `README.md` - Updated with user discounts link
+
+---
+
+## [Previous] - User Factor Documentation
 
 ### 📚 Documentation: User Factors (Invoices/Receipts)
 

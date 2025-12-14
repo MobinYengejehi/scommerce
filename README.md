@@ -207,6 +207,7 @@ S-Commerce follows a clean, layered architecture:
 | [Item Attributes](docs/item-attributes.md) | **NEW!** Store customizations with cart and order items |
 | [Product Subscriptions](docs/product-subscriptions.md) | **NEW!** Recurring billing and subscription management |
 | [User Factors](docs/user-factors.md) | Invoice and receipt management system |
+| [User Discounts](docs/user-discounts.md) | Promotional code and discount management |
 | [Contracts](docs/contracts.md) | Complete interface reference |
 | [Database Integration](docs/database-integration.md) | Implementing database persistence |
 | [File Storage](docs/file-storage.md) | File storage system guide |

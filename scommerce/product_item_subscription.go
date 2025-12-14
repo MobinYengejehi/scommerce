@@ -20,6 +20,7 @@ type productItemSubscriptionDatabase[AccountID comparable] interface {
 	userOrderDatabase[AccountID]
 	userShoppingCartDatabase[AccountID]
 	userFactorDatabase[AccountID]
+	userDiscountDatabase[AccountID]
 	DBUserRole
 }
 

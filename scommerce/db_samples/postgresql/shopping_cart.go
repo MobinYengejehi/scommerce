@@ -219,22 +219,28 @@ func (db *PostgreDatabase) NewUserShoppingCartShoppingCartItem(ctx context.Conte
 	return id, nil
 }
 
-func (db *PostgreDatabase) OrderUserShoppingCart(ctx context.Context, form *scommerce.UserShoppingCartForm[UserAccountID], sid uint64, paymentMethod uint64, address uint64, shippingMethod uint64, userComment string, orderForm *scommerce.UserOrderForm[UserAccountID]) (uint64, error) {
+func (db *PostgreDatabase) OrderUserShoppingCart(ctx context.Context, form *scommerce.UserShoppingCartForm[UserAccountID], sid uint64, paymentMethod uint64, address uint64, shippingMethod uint64, userComment string, discountCode string, orderForm *scommerce.UserOrderForm[UserAccountID]) (uint64, error) {
 	var orderID uint64
 	var userID UserAccountID
 	var orderDate time.Time
 	var orderTotal float64
 	var productItemCount uint64
 
+	var discountCodePtr *string
+	if discountCode != "" {
+		discountCodePtr = &discountCode
+	}
+
 	err := db.PgxPool.QueryRow(
 		ctx,
-		`select * from order_shopping_cart($1, $2, $3, $4, $5, $6)`,
+		`select * from order_shopping_cart($1, $2, $3, $4, $5, $6, $7)`,
 		sid,
 		paymentMethod,
 		address,
 		shippingMethod,
 		idleOrderStatusID,
 		userComment,
+		discountCodePtr,
 	).Scan(&orderID, &userID, &orderDate, &orderTotal, &productItemCount)
 	if err != nil {
 		return 0, err
@@ -456,7 +462,8 @@ func (db *PostgreDatabase) InitUserShoppingCartManager(ctx context.Context) erro
 				address_arg bigint,
 				shipping_method_arg bigint,
 				idle_status_id_arg bigint,
-				user_comment_arg text default null
+				user_comment_arg text default null,
+				discount_code_arg text default null
 			) returns table(
 				order_id bigint,
 				user_id_result bigint,
@@ -468,10 +475,16 @@ func (db *PostgreDatabase) InitUserShoppingCartManager(ctx context.Context) erro
 				v_user_id bigint;
 				v_order_id bigint;
 				v_factor_id bigint;
+				v_subtotal double precision;
+				v_discount_value double precision;
+				v_effective_discount double precision;
+				v_discounted_subtotal double precision;
+				v_shipping_cost double precision;
 				v_total double precision;
 				v_product_items jsonb;
 				v_count bigint;
 				v_wallet_balance double precision;
+				v_discount_id bigint;
 			begin
 				-- Retrieve user ID from shopping cart
 				select sc.user_id into v_user_id
@@ -497,14 +510,54 @@ func (db *PostgreDatabase) InitUserShoppingCartManager(ctx context.Context) erro
 				join product_items pi on sci.product_item_id = pi.id
 				where sci.cart_id = cart_id_arg;
 
-				-- Calculate total amount
-				select coalesce(sum(sci.quantity * pi.price), 0) + coalesce(sm.price, 0)
-				into v_total
+				-- Calculate subtotal (products only, no shipping)
+				select coalesce(sum(sci.quantity * pi.price), 0)
+				into v_subtotal
 				from shopping_cart_items sci
 				join product_items pi on sci.product_item_id = pi.id
-				cross join shipping_methods sm
-				where sci.cart_id = cart_id_arg and sm.id = shipping_method_arg
-				group by sm.price;
+				where sci.cart_id = cart_id_arg;
+
+				-- Get shipping cost
+				select coalesce(sm.price, 0)
+				into v_shipping_cost
+				from shipping_methods sm
+				where sm.id = shipping_method_arg;
+
+				-- Initialize discount values
+				v_discount_value := 0;
+				v_effective_discount := 0;
+				v_discount_id := null;
+
+				-- Process discount if provided
+				if discount_code_arg is not null and discount_code_arg != '' then
+					-- Validate discount code exists and get discount value
+					select d.id, d.value
+					into v_discount_id, v_discount_value
+					from discounts d
+					where d.code = discount_code_arg
+					  and d.valid_count > 0
+					  and not (v_user_id = any(d.used_by))
+					limit 1;
+
+					if v_discount_id is null then
+						raise exception 'Invalid discount code or discount already used';
+					end if;
+
+					-- Calculate effective discount (CRITICAL: use LEAST to prevent negative subtotals)
+					v_effective_discount := least(v_discount_value, v_subtotal);
+					
+					-- Mark discount as used
+					update discounts
+					set valid_count = valid_count - 1,
+						used_by = used_by || jsonb_build_array(v_user_id::bigint)
+					where id = v_discount_id;
+				end if;
+
+				-- Apply discount to subtotal (guaranteed to be >= 0)
+				v_discounted_subtotal := v_subtotal - v_effective_discount;
+
+				-- Calculate final total
+				v_total := v_discounted_subtotal + v_shipping_cost;
 
 				-- Validate wallet balance
 				select wallet into v_wallet_balance
@@ -515,7 +568,7 @@ func (db *PostgreDatabase) InitUserShoppingCartManager(ctx context.Context) erro
 					raise exception 'Insufficient funds: wallet balance is %, required amount is %', v_wallet_balance, v_total;
 				end if;
 
-				-- Create factor record
+				-- Create factor record with effective discount
 				insert into factors (
 					user_id,
 					products,
@@ -525,7 +578,7 @@ func (db *PostgreDatabase) InitUserShoppingCartManager(ctx context.Context) erro
 				) values (
 					v_user_id,
 					v_product_items,
-					0,
+					v_effective_discount,
 					0,
 					v_total
 				)

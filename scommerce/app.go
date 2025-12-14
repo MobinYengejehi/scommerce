@@ -22,6 +22,7 @@ type App[AccountID comparable] struct {
 	OrderStatusManager    OrderStatusManager
 	UserReviewManager     UserReviewManager[AccountID]
 	SubscriptionManager   ProductItemSubscriptionManager[AccountID]
+	DiscountManager       UserDiscountManager[AccountID]
 }
 
 type AppConfig[AccountID comparable] struct {
@@ -31,6 +32,7 @@ type AppConfig[AccountID comparable] struct {
 	OTPTokenLength             int32
 	OTPTTL                     time.Duration
 	SubscriptionRenewalHandler RenewalHandlerFunc[AccountID]
+	DiscountCodeLength         int32
 }
 
 func NewBuiltinApplication[AccountID comparable](conf *AppConfig[AccountID]) (*App[AccountID], error) {
@@ -46,6 +48,12 @@ func NewBuiltinApplication[AccountID comparable](conf *AppConfig[AccountID]) (*A
 	shoppingCartManager := NewBuiltinUserShoppingCartManager(conf.DB, conf.FileStorage, orderStatusManager)
 	userReviewManager := NewBuiltinUserReviewManager(conf.DB, conf.FileStorage)
 	subscriptionManager := NewBuiltinProductItemSubscriptionManager(conf.DB, conf.FileStorage, conf.SubscriptionRenewalHandler)
+	
+	discountCodeLength := conf.DiscountCodeLength
+	if discountCodeLength == 0 {
+		discountCodeLength = 8
+	}
+	discountManager := NewBuiltinUserDiscountManager(conf.DB, discountCodeLength)
 
 	accountManager, err := NewBuiltinUserAccountManager(
 		conf.DB,
@@ -73,6 +81,7 @@ func NewBuiltinApplication[AccountID comparable](conf *AppConfig[AccountID]) (*A
 		ShoppingCartManager:   shoppingCartManager,
 		UserReviewManager:     userReviewManager,
 		SubscriptionManager:   subscriptionManager,
+		DiscountManager:       discountManager,
 	}, nil
 }
 
@@ -91,6 +100,7 @@ func (app *App[AccountID]) Close(ctx context.Context) error {
 	err = joinErr(err, app.ShippingMethodManager.Close(ctx))
 	err = joinErr(err, app.OrderStatusManager.Close(ctx))
 	err = joinErr(err, app.SubscriptionManager.Close(ctx))
+	err = joinErr(err, app.DiscountManager.Close(ctx))
 
 	return err
 }
@@ -111,6 +121,7 @@ func (app *App[AccountID]) Init(ctx context.Context) error {
 	err = joinErr(err, app.UserReviewManager.Init(ctx))
 	err = joinErr(err, app.OrderManager.Init(ctx))
 	err = joinErr(err, app.SubscriptionManager.Init(ctx))
+	err = joinErr(err, app.DiscountManager.Init(ctx))
 
 	return err
 }
@@ -131,6 +142,7 @@ func (app *App[AccountID]) Pulse(ctx context.Context) error {
 	err = joinErr(err, app.OrderStatusManager.Pulse(ctx))
 	err = joinErr(err, app.UserReviewManager.Pulse(ctx))
 	err = joinErr(err, app.SubscriptionManager.Pulse(ctx))
+	err = joinErr(err, app.DiscountManager.Pulse(ctx))
 
 	return err
 }

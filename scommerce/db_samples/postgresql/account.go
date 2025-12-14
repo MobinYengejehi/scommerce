@@ -1736,3 +1736,101 @@ func (db *PostgreDatabase) GetUserAccountUserFactors(ctx context.Context, form *
 func (db *PostgreDatabase) GetUserAccountUserFactorCount(ctx context.Context, form *scommerce.UserAccountForm[UserAccountID], aid UserAccountID) (uint64, error) {
 	return db.GetUserFactorCount(ctx, aid)
 }
+
+func (db *PostgreDatabase) NewUserAccountDiscount(ctx context.Context, form *scommerce.UserAccountForm[UserAccountID], aid UserAccountID, value float64, validCount int64, discountForm *scommerce.UserDiscountForm[UserAccountID]) (uint64, error) {
+	return db.NewUserDiscount(ctx, aid, value, validCount, discountForm)
+}
+
+func (db *PostgreDatabase) RemoveUserAccountDiscount(ctx context.Context, form *scommerce.UserAccountForm[UserAccountID], aid UserAccountID, discountID uint64) error {
+	_, err := db.PgxPool.Exec(
+		ctx,
+		`DELETE FROM discounts WHERE id = $1 AND user_id = $2`,
+		discountID,
+		aid,
+	)
+	return err
+}
+
+func (db *PostgreDatabase) RemoveAllUserAccountDiscounts(ctx context.Context, form *scommerce.UserAccountForm[UserAccountID], aid UserAccountID) error {
+	_, err := db.PgxPool.Exec(
+		ctx,
+		`DELETE FROM discounts WHERE user_id = $1`,
+		aid,
+	)
+	return err
+}
+
+func (db *PostgreDatabase) GetUserAccountDiscounts(ctx context.Context, form *scommerce.UserAccountForm[UserAccountID], aid UserAccountID, ids []uint64, discountForms []*scommerce.UserDiscountForm[UserAccountID], skip int64, limit int64, queueOrder scommerce.QueueOrder) ([]uint64, []*scommerce.UserDiscountForm[UserAccountID], error) {
+	dids := ids
+	if dids == nil {
+		dids = make([]uint64, 0, 10)
+	}
+	forms := discountForms
+	if forms == nil {
+		forms = make([]*scommerce.UserDiscountForm[UserAccountID], 0, cap(dids))
+	}
+
+	rows, err := db.PgxPool.Query(
+		ctx,
+		`
+			SELECT
+				id,
+				user_id,
+				code,
+				value,
+				valid_count
+			FROM discounts
+			WHERE user_id = $1
+			ORDER BY id `+queueOrder.String()+`
+			OFFSET $2
+			LIMIT $3
+		`,
+		aid,
+		skip,
+		limit,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id uint64
+		var userID UserAccountID
+		var code string
+		var value float64
+		var validCount int64
+
+		if err := rows.Scan(&id, &userID, &code, &value, &validCount); err != nil {
+			return nil, nil, err
+		}
+
+		dids = append(dids, id)
+		forms = append(forms, &scommerce.UserDiscountForm[UserAccountID]{
+			ID:            id,
+			UserAccountID: userID,
+			Code:          &code,
+			Value:         &value,
+			ValidCount:    &validCount,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	return dids, forms, nil
+}
+
+func (db *PostgreDatabase) GetUserAccountDiscountCount(ctx context.Context, form *scommerce.UserAccountForm[UserAccountID], aid UserAccountID) (uint64, error) {
+	var count uint64
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`SELECT COUNT(id) FROM discounts WHERE user_id = $1`,
+		aid,
+	).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
