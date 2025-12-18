@@ -78,6 +78,27 @@ func (shoppingCartManager *BuiltinUserShoppingCartManager[AccountID]) newShoppin
 	return cart, nil
 }
 
+func (shoppingCartManager *BuiltinUserShoppingCartManager[AccountID]) newShoppingCartItem(ctx context.Context, id uint64, aid AccountID, db userShoppingCartManagerDatabase[AccountID], form *UserShoppingCartItemForm[AccountID]) (*BuiltinUserShoppingCartItem[AccountID], error) {
+	item := &BuiltinUserShoppingCartItem[AccountID]{
+		DB:                 db,
+		FS:                 shoppingCartManager.FS,
+		OrderStatusManager: shoppingCartManager.OrderStatusManager,
+		UserShoppingCartItemForm: UserShoppingCartItemForm[AccountID]{
+			ID:            id,
+			UserAccountID: aid,
+		},
+	}
+	if err := item.Init(ctx); err != nil {
+		return nil, err
+	}
+	if form != nil {
+		if err := item.ApplyFormObject(ctx, form); err != nil {
+			return nil, err
+		}
+	}
+	return item, nil
+}
+
 func (shoppingCartManager *BuiltinUserShoppingCartManager[AccountID]) GetShoppingCartBySessionText(ctx context.Context, sessionText string) (UserShoppingCart[AccountID], error) {
 	cartForm := UserShoppingCartForm[AccountID]{}
 	cid, err := shoppingCartManager.DB.GetShoppingCartBySessionText(ctx, sessionText, &cartForm)
@@ -93,6 +114,31 @@ func (shoppingCartManager *BuiltinUserShoppingCartManager[AccountID]) GetShoppin
 
 func (shoppingCartManager *BuiltinUserShoppingCartManager[AccountID]) GetShoppingCartCount(ctx context.Context) (uint64, error) {
 	return shoppingCartManager.DB.GetShoppingCartCount(ctx)
+}
+
+func (shoppingCartManager *BuiltinUserShoppingCartManager[AccountID]) GetShoppingCartWithID(ctx context.Context, cid uint64, fill bool) (UserShoppingCart[AccountID], error) {
+	if !fill {
+		return shoppingCartManager.newShoppingCart(ctx, cid, nil, shoppingCartManager.DB, nil)
+	}
+	cartForm := UserShoppingCartForm[AccountID]{}
+	err := shoppingCartManager.DB.FillUserShoppingCartWithID(ctx, cid, &cartForm)
+	if err != nil {
+		return nil, err
+	}
+	return shoppingCartManager.newShoppingCart(ctx, cid, &cartForm.UserAccountID, shoppingCartManager.DB, &cartForm)
+}
+
+func (shoppingCartManager *BuiltinUserShoppingCartManager[AccountID]) GetShoppingCartItemWithID(ctx context.Context, iid uint64, fill bool) (UserShoppingCartItem[AccountID], error) {
+	if !fill {
+		var zeroAccountID AccountID
+		return shoppingCartManager.newShoppingCartItem(ctx, iid, zeroAccountID, shoppingCartManager.DB, nil)
+	}
+	itemForm := UserShoppingCartItemForm[AccountID]{}
+	err := shoppingCartManager.DB.FillUserShoppingCartItemWithID(ctx, iid, &itemForm)
+	if err != nil {
+		return nil, err
+	}
+	return shoppingCartManager.newShoppingCartItem(ctx, iid, itemForm.UserAccountID, shoppingCartManager.DB, &itemForm)
 }
 
 func (shoppingCartManager *BuiltinUserShoppingCartManager[AccountID]) GetShoppingCarts(ctx context.Context, carts []UserShoppingCart[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserShoppingCart[AccountID], error) {

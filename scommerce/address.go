@@ -56,6 +56,19 @@ func (addressManager *BuiltinUserAddressManager[AccountID]) GetAddressCount(ctx 
 	return addressManager.DB.GetUserAddressCount(ctx)
 }
 
+func (addressManager *BuiltinUserAddressManager[AccountID]) GetAddressWithID(ctx context.Context, aid uint64, fill bool) (UserAddress[AccountID], error) {
+	if !fill {
+		var zeroAccountID AccountID
+		return addressManager.newUserAddress(ctx, aid, zeroAccountID, addressManager.DB, nil)
+	}
+	addressForm := UserAddressForm[AccountID]{}
+	err := addressManager.DB.FillUserAddressWithID(ctx, aid, &addressForm)
+	if err != nil {
+		return nil, err
+	}
+	return addressManager.newUserAddress(ctx, aid, addressForm.UserAccountID, addressManager.DB, &addressForm)
+}
+
 func (addressManager *BuiltinUserAddressManager[AccountID]) newUserAddress(ctx context.Context, id uint64, aid AccountID, db userAddressDatabase[AccountID], form *UserAddressForm[AccountID]) (*BuiltinUserAddress[AccountID], error) {
 	addr := &BuiltinUserAddress[AccountID]{
 		UserAddressForm: UserAddressForm[AccountID]{

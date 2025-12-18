@@ -77,6 +77,19 @@ func (orderManager *BuiltinUserOrderManager[AccountID]) GetUserOrderCount(ctx co
 	return orderManager.DB.GetUserOrderCount(ctx)
 }
 
+func (orderManager *BuiltinUserOrderManager[AccountID]) GetOrderWithID(ctx context.Context, oid uint64, fill bool) (UserOrder[AccountID], error) {
+	if !fill {
+		var zeroAccountID AccountID
+		return orderManager.newUserOrder(ctx, oid, zeroAccountID, orderManager.DB, nil)
+	}
+	orderForm := UserOrderForm[AccountID]{}
+	err := orderManager.DB.FillUserOrderWithID(ctx, oid, &orderForm)
+	if err != nil {
+		return nil, err
+	}
+	return orderManager.newUserOrder(ctx, oid, orderForm.UserAccountID, orderManager.DB, &orderForm)
+}
+
 func (orderManager *BuiltinUserOrderManager[AccountID]) newUserOrder(ctx context.Context, oid uint64, aid AccountID, db userOrderDatabase[AccountID], form *UserOrderForm[AccountID]) (*BuiltinUserOrder[AccountID], error) {
 	order := &BuiltinUserOrder[AccountID]{
 		UserOrderForm: UserOrderForm[AccountID]{

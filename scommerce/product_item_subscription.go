@@ -167,6 +167,19 @@ func (manager *BuiltinProductItemSubscriptionManager[AccountID]) GetSubscription
 	return manager.DB.GetProductItemSubscriptionCount(ctx)
 }
 
+func (manager *BuiltinProductItemSubscriptionManager[AccountID]) GetProductItemSubscriptionWithID(ctx context.Context, sid uint64, fill bool) (ProductItemSubscription[AccountID], error) {
+	if !fill {
+		var zeroAccountID AccountID
+		return manager.newBuiltinProductItemSubscription(ctx, sid, zeroAccountID, manager.DB, nil)
+	}
+	subscriptionForm := ProductItemSubscriptionForm[AccountID]{}
+	err := manager.DB.FillProductItemSubscriptionWithID(ctx, sid, &subscriptionForm)
+	if err != nil {
+		return nil, err
+	}
+	return manager.newBuiltinProductItemSubscription(ctx, sid, subscriptionForm.UserAccountID, manager.DB, &subscriptionForm)
+}
+
 func (manager *BuiltinProductItemSubscriptionManager[AccountID]) GetSubscriptions(ctx context.Context, subscriptions []ProductItemSubscription[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]ProductItemSubscription[AccountID], error) {
 	ids := make([]uint64, 0, GetSafeLimit(limit))
 	forms := make([]*ProductItemSubscriptionForm[AccountID], 0, cap(ids))

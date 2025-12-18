@@ -74,6 +74,19 @@ func (factorManager *BuiltinUserFactorManager[AccountID]) GetUserFactorCount(ctx
 	return factorManager.DB.GetUserFactorCount(ctx, aid)
 }
 
+func (factorManager *BuiltinUserFactorManager[AccountID]) GetFactorWithID(ctx context.Context, fid uint64, fill bool) (UserFactor[AccountID], error) {
+	if !fill {
+		var zeroAccountID AccountID
+		return factorManager.newUserFactor(ctx, fid, zeroAccountID, factorManager.DB, nil)
+	}
+	factorForm := UserFactorForm[AccountID]{}
+	err := factorManager.DB.FillUserFactorWithID(ctx, fid, &factorForm)
+	if err != nil {
+		return nil, err
+	}
+	return factorManager.newUserFactor(ctx, fid, factorForm.UserAccountID, factorManager.DB, &factorForm)
+}
+
 func (factorManager *BuiltinUserFactorManager[AccountID]) GetUserFactors(ctx context.Context, account UserAccount[AccountID], factors []UserFactor[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserFactor[AccountID], error) {
 	var err error = nil
 	aid, err := account.GetID(ctx)

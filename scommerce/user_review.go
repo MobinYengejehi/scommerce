@@ -75,6 +75,18 @@ func (reviewManager *BuiltinUserReviewManager[AccountID]) GetUserReviewCount(ctx
 	return reviewManager.DB.GetUserReviewCount(ctx)
 }
 
+func (reviewManager *BuiltinUserReviewManager[AccountID]) GetUserReviewWithID(ctx context.Context, rid uint64, fill bool) (UserReview[AccountID], error) {
+	if !fill {
+		return reviewManager.newUserReview(ctx, rid, reviewManager.DB, nil)
+	}
+	reviewForm := UserReviewForm[AccountID]{}
+	err := reviewManager.DB.FillUserReviewWithID(ctx, rid, &reviewForm)
+	if err != nil {
+		return nil, err
+	}
+	return reviewManager.newUserReview(ctx, rid, reviewManager.DB, &reviewForm)
+}
+
 func (reviewManager *BuiltinUserReviewManager[AccountID]) GetUserReviews(ctx context.Context, reviews []UserReview[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserReview[AccountID], error) {
 	var err error = nil
 	ids := make([]DBUserReviewResult[AccountID], 0, GetSafeLimit(limit))

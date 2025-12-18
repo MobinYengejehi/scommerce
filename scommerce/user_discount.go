@@ -116,6 +116,19 @@ func (discountManager *BuiltinUserDiscountManager[AccountID]) GetUserDiscountCou
 	return discountManager.DB.GetUserDiscountCount(ctx)
 }
 
+func (discountManager *BuiltinUserDiscountManager[AccountID]) GetUserDiscountWithID(ctx context.Context, did uint64, fill bool) (UserDiscount[AccountID], error) {
+	if !fill {
+		var zeroAccountID AccountID
+		return discountManager.newUserDiscount(ctx, did, zeroAccountID, discountManager.DB, nil)
+	}
+	discountForm := UserDiscountForm[AccountID]{}
+	err := discountManager.DB.FillUserDiscountWithID(ctx, did, &discountForm)
+	if err != nil {
+		return nil, err
+	}
+	return discountManager.newUserDiscount(ctx, did, discountForm.UserAccountID, discountManager.DB, &discountForm)
+}
+
 func (discountManager *BuiltinUserDiscountManager[AccountID]) GetUserDiscounts(ctx context.Context, discounts []UserDiscount[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserDiscount[AccountID], error) {
 	var err error = nil
 	ids := make([]DBUserDiscountResult[AccountID], 0, GetSafeLimit(limit))

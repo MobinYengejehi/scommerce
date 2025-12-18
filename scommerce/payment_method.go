@@ -54,6 +54,19 @@ func (paymentMethodManager *BuiltinUserPaymentMethodManager[AccountID]) GetPayme
 	return paymentMethodManager.DB.GetUserPaymentMethodCount(ctx)
 }
 
+func (paymentMethodManager *BuiltinUserPaymentMethodManager[AccountID]) GetPaymentMethodWithID(ctx context.Context, pid uint64, fill bool) (UserPaymentMethod[AccountID], error) {
+	if !fill {
+		var zeroAccountID AccountID
+		return paymentMethodManager.newPaymentMethod(ctx, pid, zeroAccountID, paymentMethodManager.DB, nil)
+	}
+	paymentMethodForm := UserPaymentMethodForm[AccountID]{}
+	err := paymentMethodManager.DB.FillUserPaymentMethodWithID(ctx, pid, &paymentMethodForm)
+	if err != nil {
+		return nil, err
+	}
+	return paymentMethodManager.newPaymentMethod(ctx, pid, paymentMethodForm.UserAccountID, paymentMethodManager.DB, &paymentMethodForm)
+}
+
 func (paymentMethodManager *BuiltinUserPaymentMethodManager[AccountID]) newPaymentMethod(ctx context.Context, pid uint64, aid AccountID, db userPaymentMethodDatabase[AccountID], form *UserPaymentMethodForm[AccountID]) (*BuiltinUserPaymentMethod[AccountID], error) {
 	method := &BuiltinUserPaymentMethod[AccountID]{
 		UserPaymentMethodForm: UserPaymentMethodForm[AccountID]{

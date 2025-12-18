@@ -72,6 +72,42 @@ func (productManager *BuiltinProductManager[AccountID]) GetProductCategoryCount(
 	return productManager.DB.GetProductCategoryCount(ctx)
 }
 
+func (productManager *BuiltinProductManager[AccountID]) GetProductCategoryWithID(ctx context.Context, cid uint64, fill bool) (ProductCategory[AccountID], error) {
+	if !fill {
+		return productManager.newProductCategory(ctx, cid, productManager.DB, nil)
+	}
+	categoryForm := ProductCategoryForm[AccountID]{}
+	err := productManager.DB.FillProductCategoryWithID(ctx, cid, &categoryForm, productManager.FS)
+	if err != nil {
+		return nil, err
+	}
+	return productManager.newProductCategory(ctx, cid, productManager.DB, &categoryForm)
+}
+
+func (productManager *BuiltinProductManager[AccountID]) GetProductWithID(ctx context.Context, pid uint64, fill bool) (Product[AccountID], error) {
+	if !fill {
+		return productManager.newProduct(ctx, pid, productManager.DB, nil)
+	}
+	productForm := ProductForm[AccountID]{}
+	err := productManager.DB.FillProductWithID(ctx, pid, &productForm, productManager.FS)
+	if err != nil {
+		return nil, err
+	}
+	return productManager.newProduct(ctx, pid, productManager.DB, &productForm)
+}
+
+func (productManager *BuiltinProductManager[AccountID]) GetProductItemWithID(ctx context.Context, iid uint64, fill bool) (ProductItem[AccountID], error) {
+	if !fill {
+		return productManager.newProductItem(ctx, iid, productManager.DB, nil)
+	}
+	itemForm := ProductItemForm[AccountID]{}
+	err := productManager.DB.FillProductItemWithID(ctx, iid, &itemForm, productManager.FS)
+	if err != nil {
+		return nil, err
+	}
+	return productManager.newProductItem(ctx, iid, productManager.DB, &itemForm)
+}
+
 func (productManager *BuiltinProductManager[AccountID]) Init(ctx context.Context) error {
 	return productManager.DB.InitProductManager(ctx)
 }
