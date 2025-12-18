@@ -145,6 +145,8 @@ func (db *PostgreDatabase) InitProductManager(ctx context.Context) error {
 							limit $3
 						',
 						case
+							when search_term_arg = '*****' then
+								'true'
 							when deepsearch_arg then
 								'(p.name = $1)'
 							else
@@ -192,6 +194,8 @@ func (db *PostgreDatabase) InitProductManager(ctx context.Context) error {
 							limit $3
 						',
 						case
+							when search_term_arg = '*****' then
+								'true'
 							when deepsearch_arg then
 								'(p.name = $1 or p.description = $1)'
 							else
@@ -263,6 +267,8 @@ func (db *PostgreDatabase) InitProductManager(ctx context.Context) error {
 							limit $3
 						',
 						case
+							when search_term_arg = '*****' then
+								'true'
 							when deepsearch_arg then
 								'(pi.name = $1 or p.name = $1 or p.description = $1 or pi.sku = $1)'
 							else
