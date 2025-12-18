@@ -116,7 +116,7 @@ func (accountManager *BuiltinUserAccountManager[AccountID]) GetAccountCount(ctx 
 	return accountManager.DB.GetUserAccountCount(ctx)
 }
 
-func (accountManager *BuiltinUserAccountManager[AccountID]) GetAccountWithID(ctx context.Context, aid AccountID) (UserAccount[AccountID], error) {
+func (accountManager *BuiltinUserAccountManager[AccountID]) GetAccountWithID(ctx context.Context, aid AccountID, fill bool) (UserAccount[AccountID], error) {
 	return accountManager.newUserAccount(ctx, aid, accountManager.DB, nil)
 }
 

@@ -52,6 +52,7 @@ type DBUserAccountManager[AccountID comparable] interface {
 	NewUserAccount(ctx context.Context, token string, password string, accountForm *UserAccountForm[AccountID]) (AccountID, error)
 	AuthenticateUserAccount(ctx context.Context, token string, password string, accountForm *UserAccountForm[AccountID]) (AccountID, error)
 	InitUserAccountManager(ctx context.Context) error
+	FillUserAccountWithID(ctx context.Context, aid AccountID, accountForm *UserAccountForm[AccountID]) error
 }
 
 type DBUserAccount[AccountID comparable] interface {

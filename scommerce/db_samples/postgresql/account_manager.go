@@ -538,6 +538,108 @@ func (db *PostgreDatabase) RemoveUserAccountWithToken(ctx context.Context, token
 	return err
 }
 
+func (db *PostgreDatabase) FillUserAccountWithID(ctx context.Context, aid UserAccountID, accountForm *scommerce.UserAccountForm[UserAccountID]) error {
+	if accountForm == nil {
+		return errors.New("account form is nil")
+	}
+
+	var token string
+	var firstName pgtype.Text
+	var lastName pgtype.Text
+	var updatedAt pgtype.Timestamptz
+	var roleID pgtype.Int8
+	var level int64
+	var isActive bool
+	var profileImagesRaw json.RawMessage
+	var bio pgtype.Text
+	var wallet float64
+	var banTill pgtype.Timestamptz
+	var banReason pgtype.Text
+
+	var err error = nil
+
+	err = db.PgxPool.QueryRow(
+		ctx,
+		`
+			select
+				"token",
+				"first_name",
+				"last_name",
+				"updated_at",
+				"role_id",
+				"level",
+				"is_active",
+				"profile_images",
+				"bio",
+				"wallet",
+				"ban_till",
+				"ban_reason"
+			from users where "id" = $1 limit 1
+		`,
+		aid,
+	).Scan(
+		&token,
+		&firstName,
+		&lastName,
+		&updatedAt,
+		&roleID,
+		&level,
+		&isActive,
+		&profileImagesRaw,
+		&bio,
+		&wallet,
+		&banTill,
+		&banReason,
+	)
+	if err != nil {
+		return err
+	}
+
+	if accountForm != nil {
+		var images []string
+		if profileImagesRaw != nil {
+			if err := json.Unmarshal(profileImagesRaw, &images); err != nil {
+				return err
+			}
+		}
+
+		var bReason *string = nil
+		if banTill.Valid && banReason.Valid {
+			bReason = &banReason.String
+		}
+
+		accountForm.ID = aid
+		accountForm.Token = &token
+		if firstName.Valid {
+			accountForm.FirstName = &firstName.String
+		}
+		if lastName.Valid {
+			accountForm.LastName = &lastName.String
+		}
+		if updatedAt.Valid {
+			accountForm.LastUpdatedAt = &updatedAt.Time
+		}
+		if roleID.Valid {
+			accountForm.Role = &scommerce.BuiltinUserRole{
+				DB: db,
+				UserRoleForm: scommerce.UserRoleForm{
+					ID: uint64(roleID.Int64),
+				},
+			}
+		}
+		accountForm.UserLevel = &level
+		accountForm.IsActiveState = &isActive
+		accountForm.ProfileImages = db.getSafeImages(images)
+		if bio.Valid {
+			accountForm.Bio = &bio.String
+		}
+		accountForm.WalletCurrency = &wallet
+		accountForm.IsBannedState = bReason
+	}
+
+	return nil
+}
+
 func (db *PostgreDatabase) hashPassword(password string) (string, error) {
 	if len(password) == 0 {
 		return "", nil

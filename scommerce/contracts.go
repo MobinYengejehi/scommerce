@@ -28,7 +28,7 @@ type UserAccountManager[AccountID comparable] interface {
 	GeneralAppObject
 
 	GetAccount(ctx context.Context, token string) (UserAccount[AccountID], error)
-	GetAccountWithID(ctx context.Context, aid AccountID) (UserAccount[AccountID], error)
+	GetAccountWithID(ctx context.Context, aid AccountID, fill bool) (UserAccount[AccountID], error)
 
 	NewAccount(ctx context.Context, token string, password string, twoFactor string) (UserAccount[AccountID], error)
 	RemoveAccount(ctx context.Context, account UserAccount[AccountID]) error
@@ -164,6 +164,8 @@ type UserAccount[AccountID comparable] interface {
 type UserOrderManager[AccountID comparable] interface {
 	GeneralAppObject
 
+	GetOrderWithID(ctx context.Context, aid uint64, fill bool) (UserOrder[AccountID], error)
+
 	RemoveAllUserOrders(ctx context.Context) error
 	GetUserOrders(ctx context.Context, orders []UserOrder[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserOrder[AccountID], error)
 	GetUserOrderCount(ctx context.Context) (uint64, error)
@@ -216,6 +218,8 @@ type UserOrder[AccountID comparable] interface {
 type UserPaymentMethodManager[AccountID comparable] interface {
 	GeneralAppObject
 
+	GetPaymentMethodWithID(ctx context.Context, aid uint64, fill bool) (UserPaymentMethod[AccountID], error)
+
 	RemoveAllPaymentMethods(ctx context.Context) error
 	GetPaymentMethods(ctx context.Context, paymentMethods []UserPaymentMethod[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserPaymentMethod[AccountID], error)
 	GetPaymentMethodCount(ctx context.Context) (uint64, error)
@@ -251,6 +255,8 @@ type UserPaymentMethod[AccountID comparable] interface {
 
 type UserAddressManager[AccountID comparable] interface {
 	GeneralAppObject
+
+	GetAddressWithID(ctx context.Context, aid uint64, fill bool) (UserAddress[AccountID], error)
 
 	RemoveAllAddresses(ctx context.Context) error
 	GetAddresses(ctx context.Context, addresses []UserAddress[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserAddress[AccountID], error)
@@ -294,6 +300,8 @@ type UserAddress[AccountID comparable] interface {
 type UserRoleManager interface {
 	GeneralAppObject
 
+	GetRoleWithID(ctx context.Context, aid uint64, fill bool) (UserRole, error)
+
 	NewUserRole(ctx context.Context, name string) (UserRole, error)
 	RemoveUserRole(ctx context.Context, role UserRole) error
 	RemoveAllUserRoles(ctx context.Context) error
@@ -319,6 +327,9 @@ type UserRole interface {
 
 type UserShoppingCartManager[AccountID comparable] interface {
 	GeneralAppObject
+
+	GetShoppingCartWithID(ctx context.Context, aid uint64, fill bool) (UserShoppingCart[AccountID], error)
+	GetShoppingCartItemWithID(ctx context.Context, aid uint64, fill bool) (UserShoppingCartItem[AccountID], error)
 
 	RemoveAllShoppingCarts(ctx context.Context) error
 	GetShoppingCarts(ctx context.Context, carts []UserShoppingCart[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserShoppingCart[AccountID], error) // for all users
@@ -377,6 +388,8 @@ type UserShoppingCartItem[AccountID comparable] interface {
 type UserFactorManager[AccountID comparable] interface {
 	GeneralAppObject
 
+	GetFactorWithID(ctx context.Context, aid uint64, fill bool) (UserFactor[AccountID], error)
+
 	GetUserFactors(ctx context.Context, account UserAccount[AccountID], factors []UserFactor[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserFactor[AccountID], error)
 	GetUserFactorCount(ctx context.Context, account UserAccount[AccountID]) (uint64, error)
 	RemoveAllUserFactors(ctx context.Context) error
@@ -409,6 +422,10 @@ type UserFactor[AccountID comparable] interface {
 
 type ProductManager[AccountID comparable] interface {
 	GeneralAppObject
+
+	GetProductCategoryWithID(ctx context.Context, aid uint64, fill bool) (ProductCategory[AccountID], error)
+	GetProductWithID(ctx context.Context, aid uint64, fill bool) (Product[AccountID], error)
+	GetProductItemWithID(ctx context.Context, aid uint64, fill bool) (ProductItem[AccountID], error)
 
 	NewProductCategory(ctx context.Context, name string, parentCategory ProductCategory[AccountID]) (ProductCategory[AccountID], error)
 	RemoveProductCategory(ctx context.Context, category ProductCategory[AccountID]) error
@@ -504,6 +521,8 @@ type RenewalHandlerFunc[AccountID comparable] func(ctx context.Context, subscrip
 type ProductItemSubscriptionManager[AccountID comparable] interface {
 	GeneralAppObject
 
+	GetProductItemSubscriptionWithID(ctx context.Context, aid uint64, fill bool) (ProductItemSubscription[AccountID], error)
+
 	NewSubscription(ctx context.Context, account UserAccount[AccountID], productItem ProductItem[AccountID], duration time.Duration, subscriptionType string, autoRenew bool) (ProductItemSubscription[AccountID], error)
 	RemoveSubscription(ctx context.Context, subscription ProductItemSubscription[AccountID]) error
 	RemoveAllSubscriptions(ctx context.Context) error
@@ -558,6 +577,8 @@ type ProductItemSubscription[AccountID comparable] interface {
 type CountryManager interface {
 	GeneralAppObject
 
+	GetCountryWithID(ctx context.Context, aid uint64, fill bool) (Country, error)
+
 	NewCountry(ctx context.Context, name string) (Country, error)
 	RemoveCountry(ctx context.Context, country Country) error
 	RemoveAllCountries(ctx context.Context) error
@@ -584,6 +605,8 @@ type Country interface {
 type PaymentTypeManager interface {
 	GeneralAppObject
 
+	GetPaymentTypeWithID(ctx context.Context, aid uint64, fill bool) (PaymentType, error)
+
 	NewPaymentType(ctx context.Context, name string) (PaymentType, error)
 	RemovePaymentType(ctx context.Context, paymentType PaymentType) error
 	RemoveAllPaymentTypes(ctx context.Context) error
@@ -609,6 +632,8 @@ type PaymentType interface {
 
 type ShippingMethodManager interface {
 	GeneralAppObject
+
+	GetShippingMethodWithID(ctx context.Context, aid uint64, fill bool) (ShippingMethod, error)
 
 	NewShippingMethod(ctx context.Context, name string, price float64) (ShippingMethod, error)
 	RemoveShippingMethod(ctx context.Context, shippingMethod ShippingMethod) error
@@ -637,6 +662,8 @@ type ShippingMethod interface {
 
 type OrderStatusManager interface {
 	GeneralAppObject
+
+	GetOrderStatusWithID(ctx context.Context, aid uint64, fill bool) (OrderStatus, error)
 
 	NewOrderStatus(ctx context.Context, name string) (OrderStatus, error)
 	RemoveOrderStatus(ctx context.Context, status OrderStatus) error
@@ -668,6 +695,8 @@ type OrderStatus interface {
 
 type UserReviewManager[AccountID comparable] interface {
 	GeneralAppObject
+
+	GetUserReviewWithID(ctx context.Context, aid uint64, fill bool) (UserReview[AccountID], error)
 
 	NewUserReview(ctx context.Context, account UserAccount[AccountID], productItem ProductItem[AccountID], ratingValue int32, comment string) (UserReview[AccountID], error)
 	RemoveUserReview(ctx context.Context, review UserReview[AccountID]) error
@@ -701,6 +730,8 @@ type UserReview[AccountID comparable] interface {
 
 type UserDiscountManager[AccountID comparable] interface {
 	GeneralAppObject
+
+	GetUserDiscountWithID(ctx context.Context, aid uint64, fill bool) (UserDiscount[AccountID], error)
 
 	NewUserDiscount(ctx context.Context, ownerAccount UserAccount[AccountID], value float64, validCount int64) (UserDiscount[AccountID], error)
 	RemoveUserDiscount(ctx context.Context, discount UserDiscount[AccountID]) error
