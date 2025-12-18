@@ -2,6 +2,7 @@ package dbsamples
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
@@ -395,5 +396,92 @@ func (db *PostgreDatabase) SetUserPaymentMethodProvider(ctx context.Context, for
 	if form != nil {
 		form.Provider = &provider
 	}
+	return nil
+}
+
+func (db *PostgreDatabase) FillUserPaymentMethodWithID(ctx context.Context, mid uint64, paymentMethodForm *scommerce.UserPaymentMethodForm[UserAccountID]) error {
+	if paymentMethodForm == nil {
+		return errors.New("payment method form is nil")
+	}
+
+	var userID UserAccountID
+	var paymentTypeID uint64
+	var provider pgtype.Text
+	var accountNumber pgtype.Text
+	var expiryDate pgtype.Date
+	var isDefault bool
+
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`
+			select
+				"user_id",
+				"payment_type_id",
+				"provider",
+				"account_number",
+				"expiry_date",
+				"is_default"
+			from payment_methods
+			where "id" = $1
+			limit 1
+		`,
+		mid,
+	).Scan(
+		&userID,
+		&paymentTypeID,
+		&provider,
+		&accountNumber,
+		&expiryDate,
+		&isDefault,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Check if payment method expired
+	var isExpired bool
+	err = db.PgxPool.QueryRow(
+		ctx,
+		`select "expiry_date" < current_date as "is_expired" from payment_methods where "id" = $1 limit 1`,
+		mid,
+	).Scan(&isExpired)
+	if err != nil {
+		return err
+	}
+
+	paymentMethodForm.ID = mid
+	paymentMethodForm.UserAccountID = userID
+	paymentMethodForm.IsDefaultState = &isDefault
+	paymentMethodForm.IsExpiredState = &isExpired
+
+	if provider.Valid {
+		paymentMethodForm.Provider = &provider.String
+	} else {
+		paymentMethodForm.Provider = nil
+	}
+
+	if accountNumber.Valid {
+		paymentMethodForm.AccountNumber = &accountNumber.String
+	} else {
+		paymentMethodForm.AccountNumber = nil
+	}
+
+	if expiryDate.Valid {
+		paymentMethodForm.ExpiryDate = &expiryDate.Time
+	} else {
+		paymentMethodForm.ExpiryDate = nil
+	}
+
+	if paymentTypeID != 0 {
+		paymentMethodForm.PaymentType = &scommerce.BuiltinPaymentType{
+			DB: db,
+			PaymentTypeForm: scommerce.PaymentTypeForm{
+				ID: paymentTypeID,
+			},
+		}
+	} else {
+		paymentMethodForm.PaymentType = nil
+	}
+
 	return nil
 }

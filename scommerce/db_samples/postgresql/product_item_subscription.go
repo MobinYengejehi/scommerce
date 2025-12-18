@@ -2,6 +2,7 @@ package dbsamples
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
@@ -547,5 +548,75 @@ func (db *PostgreDatabase) CancelProductItemSubscription(ctx context.Context, fo
 		form.IsActive = &falseVal
 		form.AutoRenew = &falseVal
 	}
+	return nil
+}
+
+func (db *PostgreDatabase) FillProductItemSubscriptionWithID(ctx context.Context, sid uint64, subscriptionForm *scommerce.ProductItemSubscriptionForm[UserAccountID]) error {
+	if subscriptionForm == nil {
+		return errors.New("subscription form is nil")
+	}
+
+	var userID UserAccountID
+	var productItemID uint64
+	var subscribedAt time.Time
+	var expiresAt time.Time
+	var durationNanos int64
+	var subscriptionType *string
+	var autoRenew bool
+	var isActive bool
+
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`
+			select
+				"user_account_id",
+				"product_item_id",
+				"subscribed_at",
+				"expires_at",
+				"duration_nanoseconds",
+				"subscription_type",
+				"auto_renew",
+				"is_active"
+			from product_item_subscriptions
+			where "id" = $1
+			limit 1
+		`,
+		sid,
+	).Scan(
+		&userID,
+		&productItemID,
+		&subscribedAt,
+		&expiresAt,
+		&durationNanos,
+		&subscriptionType,
+		&autoRenew,
+		&isActive,
+	)
+	if err != nil {
+		return err
+	}
+
+	duration := time.Duration(durationNanos)
+
+	subscriptionForm.ID = sid
+	subscriptionForm.UserAccountID = userID
+	subscriptionForm.SubscribedAt = &subscribedAt
+	subscriptionForm.ExpiresAt = &expiresAt
+	subscriptionForm.Duration = &duration
+	subscriptionForm.SubscriptionType = subscriptionType
+	subscriptionForm.AutoRenew = &autoRenew
+	subscriptionForm.IsActive = &isActive
+
+	if productItemID != 0 {
+		subscriptionForm.ProductItem = &scommerce.BuiltinProductItem[UserAccountID]{
+			DB: db,
+			ProductItemForm: scommerce.ProductItemForm[UserAccountID]{
+				ID: productItemID,
+			},
+		}
+	} else {
+		subscriptionForm.ProductItem = nil
+	}
+
 	return nil
 }

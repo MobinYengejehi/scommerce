@@ -3,6 +3,7 @@ package dbsamples
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
 
@@ -577,4 +578,178 @@ func (db *PostgreDatabase) SearchForProducts(ctx context.Context, searchText str
 	}
 
 	return ids, forms, nil
+}
+
+func (db *PostgreDatabase) FillProductCategoryWithID(ctx context.Context, cid uint64, catForm *scommerce.ProductCategoryForm[UserAccountID], fs scommerce.FileStorage) error {
+	if catForm == nil {
+		return errors.New("product category form is nil")
+	}
+
+	var name string
+	var parentCategoryID pgtype.Int8
+
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`
+			select
+				"name",
+				"parent_category_id"
+			from product_categories
+			where "id" = $1
+			limit 1
+		`,
+		cid,
+	).Scan(
+		&name,
+		&parentCategoryID,
+	)
+	if err != nil {
+		return err
+	}
+
+	catForm.ID = cid
+	catForm.Name = &name
+	catForm.ParentProductCategory = db.newProductCategory(parentCategoryID, fs)
+
+	return nil
+}
+
+func (db *PostgreDatabase) FillProductWithID(ctx context.Context, pid uint64, productForm *scommerce.ProductForm[UserAccountID], fs scommerce.FileStorage) error {
+	if productForm == nil {
+		return errors.New("product form is nil")
+	}
+
+	var name string
+	var description pgtype.Text
+	var productImages json.RawMessage
+	var categoryID pgtype.Int8
+
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`
+			select
+				"name",
+				"description",
+				"product_images",
+				"category_id"
+			from products
+			where "id" = $1
+			limit 1
+		`,
+		pid,
+	).Scan(
+		&name,
+		&description,
+		&productImages,
+		&categoryID,
+	)
+	if err != nil {
+		return err
+	}
+
+	var images []string
+	if productImages != nil {
+		if err := json.Unmarshal(productImages, &images); err != nil {
+			return err
+		}
+	}
+
+	productForm.ID = pid
+	productForm.Name = &name
+
+	if description.Valid {
+		productForm.Description = &description.String
+	} else {
+		productForm.Description = nil
+	}
+
+	productForm.Images = db.getSafeImages(images)
+
+	if categoryID.Valid {
+		productForm.ProductCategory = &scommerce.BuiltinProductCategory[UserAccountID]{
+			DB: db,
+			FS: fs,
+			ProductCategoryForm: scommerce.ProductCategoryForm[UserAccountID]{
+				ID: uint64(categoryID.Int64),
+			},
+		}
+	} else {
+		productForm.ProductCategory = nil
+	}
+
+	return nil
+}
+
+func (db *PostgreDatabase) FillProductItemWithID(ctx context.Context, iid uint64, itemForm *scommerce.ProductItemForm[UserAccountID], fs scommerce.FileStorage) error {
+	if itemForm == nil {
+		return errors.New("product item form is nil")
+	}
+
+	var sku string
+	var name string
+	var price float64
+	var quantityInStock int32
+	var attributes json.RawMessage
+	var itemImages json.RawMessage
+	var productID pgtype.Int8
+
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`
+			select
+				"sku",
+				"name",
+				"price",
+				"quantity_in_stock",
+				"attributes",
+				"product_images",
+				"product_id"
+			from product_items
+			where "id" = $1
+			limit 1
+		`,
+		iid,
+	).Scan(
+		&sku,
+		&name,
+		&price,
+		&quantityInStock,
+		&attributes,
+		&itemImages,
+		&productID,
+	)
+	if err != nil {
+		return err
+	}
+
+	var images []string
+	if itemImages != nil {
+		if err := json.Unmarshal(itemImages, &images); err != nil {
+			return err
+		}
+	}
+
+	quantity := uint64(quantityInStock)
+
+	itemForm.ID = iid
+	itemForm.SKU = &sku
+	itemForm.Name = &name
+	itemForm.Price = &price
+	itemForm.QuantityInStock = &quantity
+	itemForm.Attributes = &attributes
+	itemForm.Images = db.getSafeImages(images)
+
+	if productID.Valid {
+		itemForm.Product = &scommerce.BuiltinProduct[UserAccountID]{
+			DB: db,
+			FS: fs,
+			ProductForm: scommerce.ProductForm[UserAccountID]{
+				ID: uint64(productID.Int64),
+			},
+		}
+	} else {
+		itemForm.Product = nil
+	}
+
+	return nil
 }

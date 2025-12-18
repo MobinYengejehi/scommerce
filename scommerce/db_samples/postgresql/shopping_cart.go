@@ -3,6 +3,7 @@ package dbsamples
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
@@ -637,4 +638,106 @@ func (db *PostgreDatabase) RemoveAllShoppingCarts(ctx context.Context) error {
 		`delete from shopping_carts`,
 	)
 	return err
+}
+
+func (db *PostgreDatabase) FillUserShoppingCartWithID(ctx context.Context, cid uint64, cartForm *scommerce.UserShoppingCartForm[UserAccountID]) error {
+	if cartForm == nil {
+		return errors.New("shopping cart form is nil")
+	}
+
+	var userID UserAccountID
+	var sessionText pgtype.Text
+
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`
+			select
+				"user_id",
+				"session_text"
+			from shopping_carts
+			where "id" = $1
+			limit 1
+		`,
+		cid,
+	).Scan(
+		&userID,
+		&sessionText,
+	)
+	if err != nil {
+		return err
+	}
+
+	cartForm.ID = cid
+	cartForm.UserAccountID = userID
+
+	if sessionText.Valid {
+		cartForm.SessionText = &sessionText.String
+	} else {
+		cartForm.SessionText = nil
+	}
+
+	return nil
+}
+
+func (db *PostgreDatabase) FillUserShoppingCartItemWithID(ctx context.Context, iid uint64, cartForm *scommerce.UserShoppingCartItemForm[UserAccountID]) error {
+	if cartForm == nil {
+		return errors.New("shopping cart item form is nil")
+	}
+
+	var cartID uint64
+	var productItemID uint64
+	var quantity int64
+	var attributes json.RawMessage
+
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`
+			select
+				"cart_id",
+				"product_item_id",
+				"quantity",
+				coalesce("attributes", 'null'::jsonb)
+			from shopping_cart_items
+			where "id" = $1
+			limit 1
+		`,
+		iid,
+	).Scan(
+		&cartID,
+		&productItemID,
+		&quantity,
+		&attributes,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Get user ID from cart
+	var userID UserAccountID
+	err = db.PgxPool.QueryRow(
+		ctx,
+		`select "user_id" from shopping_carts where "id" = $1 limit 1`,
+		cartID,
+	).Scan(&userID)
+	if err != nil {
+		return err
+	}
+
+	cartForm.ID = iid
+	cartForm.UserAccountID = userID
+	cartForm.Quantity = &quantity
+	cartForm.Attributes = &attributes
+
+	if productItemID != 0 {
+		cartForm.ProductItem = &scommerce.BuiltinProductItem[UserAccountID]{
+			DB: db,
+			ProductItemForm: scommerce.ProductItemForm[UserAccountID]{
+				ID: productItemID,
+			},
+		}
+	} else {
+		cartForm.ProductItem = nil
+	}
+
+	return nil
 }

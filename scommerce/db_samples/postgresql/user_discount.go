@@ -3,6 +3,7 @@ package dbsamples
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
 )
@@ -481,4 +482,55 @@ func (db *PostgreDatabase) HasUserUsedDiscount(ctx context.Context, form *scomme
 	}
 
 	return hasUsed, nil
+}
+
+func (db *PostgreDatabase) FillUserDiscountWithID(ctx context.Context, did uint64, discountForm *scommerce.UserDiscountForm[UserAccountID]) error {
+	if discountForm == nil {
+		return errors.New("discount form is nil")
+	}
+
+	var userID UserAccountID
+	var code string
+	var value float64
+	var validCount int64
+	var usedByJSON []byte
+
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`
+			select
+				"user_id",
+				"code",
+				"value",
+				"valid_count",
+				"used_by"
+			from discounts
+			where "id" = $1
+			limit 1
+		`,
+		did,
+	).Scan(
+		&userID,
+		&code,
+		&value,
+		&validCount,
+		&usedByJSON,
+	)
+	if err != nil {
+		return err
+	}
+
+	var usedBy []UserAccountID
+	if err := json.Unmarshal(usedByJSON, &usedBy); err != nil {
+		return err
+	}
+
+	discountForm.ID = did
+	discountForm.UserAccountID = userID
+	discountForm.Code = &code
+	discountForm.Value = &value
+	discountForm.ValidCount = &validCount
+	discountForm.UsedBy = &usedBy
+
+	return nil
 }

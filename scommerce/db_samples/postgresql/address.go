@@ -2,6 +2,7 @@ package dbsamples
 
 import (
 	"context"
+	"errors"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
 
@@ -542,5 +543,116 @@ func (db *PostgreDatabase) SetUserAddressUnitNumber(ctx context.Context, form *s
 	if form != nil {
 		form.UnitNumber = &number
 	}
+	return nil
+}
+
+func (db *PostgreDatabase) FillUserAddressWithID(ctx context.Context, aid uint64, addressForm *scommerce.UserAddressForm[UserAccountID]) error {
+	if addressForm == nil {
+		return errors.New("address form is nil")
+	}
+
+	var uid UserAccountID
+	var unitNumber pgtype.Text
+	var streetNumber pgtype.Text
+	var addressLine1 pgtype.Text
+	var addressLine2 pgtype.Text
+	var city pgtype.Text
+	var region pgtype.Text
+	var postalCode pgtype.Text
+	var countryID pgtype.Int8
+	var isDefault bool
+
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`
+			select
+				"user_id",
+				"unit_number",
+				"street_number",
+				"address_line1",
+				"address_line2",
+				"city",
+				"region",
+				"postal_code",
+				"country_id",
+				"is_default"
+			from addresses
+			where "id" = $1
+			limit 1
+		`,
+		aid,
+	).Scan(
+		&uid,
+		&unitNumber,
+		&streetNumber,
+		&addressLine1,
+		&addressLine2,
+		&city,
+		&region,
+		&postalCode,
+		&countryID,
+		&isDefault,
+	)
+	if err != nil {
+		return err
+	}
+
+	addressForm.ID = aid
+	addressForm.UserAccountID = uid
+	addressForm.IsDefaultState = &isDefault
+
+	if unitNumber.Valid {
+		addressForm.UnitNumber = &unitNumber.String
+	} else {
+		addressForm.UnitNumber = nil
+	}
+
+	if streetNumber.Valid {
+		addressForm.StreetNumber = &streetNumber.String
+	} else {
+		addressForm.StreetNumber = nil
+	}
+
+	if addressLine1.Valid {
+		addressForm.AddressLine1 = &addressLine1.String
+	} else {
+		addressForm.AddressLine1 = nil
+	}
+
+	if addressLine2.Valid {
+		addressForm.AddressLine2 = &addressLine2.String
+	} else {
+		addressForm.AddressLine2 = nil
+	}
+
+	if city.Valid {
+		addressForm.City = &city.String
+	} else {
+		addressForm.City = nil
+	}
+
+	if region.Valid {
+		addressForm.Region = &region.String
+	} else {
+		addressForm.Region = nil
+	}
+
+	if postalCode.Valid {
+		addressForm.PostalCode = &postalCode.String
+	} else {
+		addressForm.PostalCode = nil
+	}
+
+	if countryID.Valid {
+		addressForm.Country = &scommerce.BuiltinCountry{
+			DB: db,
+			CountryForm: scommerce.CountryForm{
+				ID: uint64(countryID.Int64),
+			},
+		}
+	} else {
+		addressForm.Country = nil
+	}
+
 	return nil
 }

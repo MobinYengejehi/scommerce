@@ -3,6 +3,7 @@ package dbsamples
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
 )
@@ -250,5 +251,51 @@ func (db *PostgreDatabase) SetUserFactorAmountPaid(ctx context.Context, form *sc
 	if form != nil {
 		form.AmountPaid = &amountPaid
 	}
+	return nil
+}
+
+func (db *PostgreDatabase) FillUserFactorWithID(ctx context.Context, fid uint64, factorForm *scommerce.UserFactorForm[UserAccountID]) error {
+	if factorForm == nil {
+		return errors.New("factor form is nil")
+	}
+
+	var userID UserAccountID
+	var products json.RawMessage
+	var discount float64
+	var tax float64
+	var amountPaid float64
+
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`
+			select
+				"user_id",
+				"products",
+				"discount",
+				"tax",
+				"amount_paid"
+			from factors
+			where "id" = $1
+			limit 1
+		`,
+		fid,
+	).Scan(
+		&userID,
+		&products,
+		&discount,
+		&tax,
+		&amountPaid,
+	)
+	if err != nil {
+		return err
+	}
+
+	factorForm.ID = fid
+	factorForm.UserAccountID = userID
+	factorForm.Products = &products
+	factorForm.Discount = &discount
+	factorForm.Tax = &tax
+	factorForm.AmountPaid = &amountPaid
+
 	return nil
 }

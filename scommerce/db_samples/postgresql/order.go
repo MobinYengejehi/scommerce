@@ -3,6 +3,7 @@ package dbsamples
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
@@ -831,4 +832,128 @@ func (db *PostgreDatabase) RemoveAllUserOrders(ctx context.Context) error {
 		`delete from orders`,
 	)
 	return err
+}
+
+func (db *PostgreDatabase) FillUserOrderWithID(ctx context.Context, oid uint64, orderForm *scommerce.UserOrderForm[UserAccountID]) error {
+	if orderForm == nil {
+		return errors.New("order form is nil")
+	}
+
+	var userID UserAccountID
+	var orderDate time.Time
+	var orderTotal float64
+	var userComment pgtype.Text
+	var deliveryDate pgtype.Timestamptz
+	var deliveryComment pgtype.Text
+	var productItems json.RawMessage
+	var paymentMethodID pgtype.Int8
+	var shippingMethodID pgtype.Int8
+	var orderStatusID pgtype.Int8
+	var shippingAddressID pgtype.Int8
+
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`
+			select
+				"user_id",
+				"order_date",
+				"order_total",
+				"user_comment",
+				"delivery_date",
+				"delivery_comment",
+				"product_items",
+				"payment_method_id",
+				"shipping_method_id",
+				"order_status_id",
+				"shipping_address_id"
+			from orders
+			where "id" = $1
+			limit 1
+		`,
+		oid,
+	).Scan(
+		&userID,
+		&orderDate,
+		&orderTotal,
+		&userComment,
+		&deliveryDate,
+		&deliveryComment,
+		&productItems,
+		&paymentMethodID,
+		&shippingMethodID,
+		&orderStatusID,
+		&shippingAddressID,
+	)
+	if err != nil {
+		return err
+	}
+
+	orderForm.ID = oid
+	orderForm.UserAccountID = userID
+	orderForm.Date = &orderDate
+	orderForm.Total = &orderTotal
+
+	if userComment.Valid {
+		orderForm.UserComment = &userComment.String
+	} else {
+		orderForm.UserComment = nil
+	}
+
+	if deliveryDate.Valid {
+		orderForm.DeliveryDate = &deliveryDate.Time
+	} else {
+		orderForm.DeliveryDate = nil
+	}
+
+	if deliveryComment.Valid {
+		orderForm.DeliveryComment = &deliveryComment.String
+	} else {
+		orderForm.DeliveryComment = nil
+	}
+
+	if paymentMethodID.Valid {
+		orderForm.PaymentMethod = &scommerce.BuiltinUserPaymentMethod[UserAccountID]{
+			DB: db,
+			UserPaymentMethodForm: scommerce.UserPaymentMethodForm[UserAccountID]{
+				ID: uint64(paymentMethodID.Int64),
+			},
+		}
+	} else {
+		orderForm.PaymentMethod = nil
+	}
+
+	if shippingMethodID.Valid {
+		orderForm.ShippingMethod = &scommerce.BuiltinShippingMethod{
+			DB: db,
+			ShippingMethodForm: scommerce.ShippingMethodForm{
+				ID: uint64(shippingMethodID.Int64),
+			},
+		}
+	} else {
+		orderForm.ShippingMethod = nil
+	}
+
+	if orderStatusID.Valid {
+		orderForm.Status = &scommerce.BuiltinOrderStatus{
+			DB: db,
+			OrderStatusForm: scommerce.OrderStatusForm{
+				ID: uint64(orderStatusID.Int64),
+			},
+		}
+	} else {
+		orderForm.Status = nil
+	}
+
+	if shippingAddressID.Valid {
+		orderForm.ShippingAddress = &scommerce.BuiltinUserAddress[UserAccountID]{
+			DB: db,
+			UserAddressForm: scommerce.UserAddressForm[UserAccountID]{
+				ID: uint64(shippingAddressID.Int64),
+			},
+		}
+	} else {
+		orderForm.ShippingAddress = nil
+	}
+
+	return nil
 }

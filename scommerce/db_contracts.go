@@ -139,7 +139,7 @@ type DBUserShoppingCartManager[AccountID comparable] interface {
 	GetShoppingCarts(ctx context.Context, ids []DBUserUserShoppingCartResult[AccountID], cartForms []*UserShoppingCartForm[AccountID], skip int64, limit int64, order QueueOrder) ([]DBUserUserShoppingCartResult[AccountID], []*UserShoppingCartForm[AccountID], error)
 	RemoveAllShoppingCarts(ctx context.Context) error
 	InitUserShoppingCartManager(ctx context.Context) error
-	FillUserShoppingCartWithID(ctx context.Context, cid uint64, aid AccountID, cartForm *UserShoppingCartForm[AccountID]) error
+	FillUserShoppingCartWithID(ctx context.Context, cid uint64, cartForm *UserShoppingCartForm[AccountID]) error
 	FillUserShoppingCartItemWithID(ctx context.Context, iid uint64, cartForm *UserShoppingCartItemForm[AccountID]) error
 }
 
@@ -176,7 +176,7 @@ type DBUserOrderManager[AccountID comparable] interface {
 	GetUserOrders(ctx context.Context, orders []DBUserOrderResult[AccountID], orderForms []*UserOrderForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]DBUserOrderResult[AccountID], []*UserOrderForm[AccountID], error)
 	RemoveAllUserOrders(ctx context.Context) error
 	InitUserOrderManager(ctx context.Context) error
-	FillUserOrderWithID(ctx context.Context, oid uint64, aid AccountID, orderForm *UserOrderForm[AccountID]) error
+	FillUserOrderWithID(ctx context.Context, oid uint64, orderForm *UserOrderForm[AccountID]) error
 }
 
 type DBUserOrderProductItem struct {
@@ -219,7 +219,7 @@ type DBUserPaymentMethodManager[AccountID comparable] interface {
 	GetUserPaymentMethods(ctx context.Context, methods []DBUserPaymentMethodResult[AccountID], methodForms []*UserPaymentMethodForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]DBUserPaymentMethodResult[AccountID], []*UserPaymentMethodForm[AccountID], error)
 	RemoveAllUserPaymentMethods(ctx context.Context) error
 	InitUserPaymentMethodManager(ctx context.Context) error
-	FillUserPaymentMethodWithID(ctx context.Context, mid uint64, aid AccountID, paymentMethodForm *UserPaymentMethodForm[AccountID]) error
+	FillUserPaymentMethodWithID(ctx context.Context, mid uint64, paymentMethodForm *UserPaymentMethodForm[AccountID]) error
 }
 
 type DBUserPaymentMethod[AccountID comparable] interface {
@@ -245,7 +245,7 @@ type DBUserAddressManager[AccountID comparable] interface {
 	GetUserAddresses(ctx context.Context, addresses []DBUserAddressResult[AccountID], addressForms []*UserAddressForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]DBUserAddressResult[AccountID], []*UserAddressForm[AccountID], error)
 	RemoveAllUserAddresses(ctx context.Context) error
 	InitUserAddressManager(ctx context.Context) error
-	FillUserAddressWithID(ctx context.Context, aid uint64, userID AccountID, addressForm *UserAddressForm[AccountID]) error
+	FillUserAddressWithID(ctx context.Context, aid uint64, addressForm *UserAddressForm[AccountID]) error
 }
 
 type DBUserAddress[AccountID comparable] interface {
@@ -438,7 +438,7 @@ type DBUserReviewManager[AccountID comparable] interface {
 	GetUserReviews(ctx context.Context, ids []DBUserReviewResult[AccountID], reviewForms []*UserReviewForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]DBUserReviewResult[AccountID], []*UserReviewForm[AccountID], error)
 	GetUserReviewsForProductItem(ctx context.Context, productItemID uint64, ids []DBUserReviewResult[AccountID], reviewForms []*UserReviewForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]DBUserReviewResult[AccountID], []*UserReviewForm[AccountID], error)
 	GetUserReviewsForAccount(ctx context.Context, accountID AccountID, ids []DBUserReviewResult[AccountID], reviewForms []*UserReviewForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]DBUserReviewResult[AccountID], []*UserReviewForm[AccountID], error)
-	FillUserReviewWithID(ctx context.Context, rid uint64, aid AccountID, reviewForm *UserReviewForm[AccountID]) error
+	FillUserReviewWithID(ctx context.Context, rid uint64, reviewForm *UserReviewForm[AccountID]) error
 }
 
 type DBUserReview[AccountID comparable] interface {
@@ -461,7 +461,7 @@ type DBProductItemSubscriptionManager[AccountID comparable] interface {
 	GetProductItemSubscriptionsForProduct(ctx context.Context, productItemID uint64, ids []uint64, forms []*ProductItemSubscriptionForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]uint64, []*ProductItemSubscriptionForm[AccountID], error)
 	GetProductItemSubscriptionCountForProduct(ctx context.Context, productItemID uint64) (uint64, error)
 	GetExpiredSubscriptionsForRenewal(ctx context.Context, now time.Time, ids []uint64, forms []*ProductItemSubscriptionForm[AccountID], limit int64) ([]uint64, []*ProductItemSubscriptionForm[AccountID], error)
-	FillProductItemSubscriptionWithID(ctx context.Context, sid uint64, aid AccountID, subscriptionForm *ProductItemSubscriptionForm[AccountID]) error
+	FillProductItemSubscriptionWithID(ctx context.Context, sid uint64, subscriptionForm *ProductItemSubscriptionForm[AccountID]) error
 }
 
 type DBProductItemSubscription[AccountID comparable] interface {
@@ -489,7 +489,7 @@ type DBUserFactorManager[AccountID comparable] interface {
 	GetUserFactors(ctx context.Context, aid AccountID, ids []uint64, factorForms []*UserFactorForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]uint64, []*UserFactorForm[AccountID], error)
 	RemoveAllUserFactors(ctx context.Context) error
 	RemoveUserAccountFactors(ctx context.Context, aid AccountID) error
-	FillUserFactorWithID(ctx context.Context, fid uint64, aid AccountID, factorForm *UserFactorForm[AccountID]) error
+	FillUserFactorWithID(ctx context.Context, fid uint64, factorForm *UserFactorForm[AccountID]) error
 }
 
 type DBUserFactor[AccountID comparable] interface {
@@ -518,7 +518,7 @@ type DBUserDiscountManager[AccountID comparable] interface {
 	GetUserDiscountByCode(ctx context.Context, code string, discountForm *UserDiscountForm[AccountID]) (DBUserDiscountResult[AccountID], error)
 	ExistsUserDiscountCode(ctx context.Context, code string) (bool, error)
 	GetUserDiscountsForAccount(ctx context.Context, ownerAccountID AccountID, ids []uint64, discountForms []*UserDiscountForm[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]uint64, []*UserDiscountForm[AccountID], error)
-	FillUserDiscountWithID(ctx context.Context, did uint64, aid AccountID, discountForm *UserDiscountForm[AccountID]) error
+	FillUserDiscountWithID(ctx context.Context, did uint64, discountForm *UserDiscountForm[AccountID]) error
 }
 
 type DBUserDiscount[AccountID comparable] interface {

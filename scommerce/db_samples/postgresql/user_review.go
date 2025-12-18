@@ -2,6 +2,7 @@ package dbsamples
 
 import (
 	"context"
+	"errors"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
 
@@ -420,4 +421,61 @@ func (db *PostgreDatabase) GetUserReviewProductItem(ctx context.Context, form *s
 		}
 	}
 	return productItemID, nil
+}
+
+func (db *PostgreDatabase) FillUserReviewWithID(ctx context.Context, rid uint64, reviewForm *scommerce.UserReviewForm[UserAccountID]) error {
+	if reviewForm == nil {
+		return errors.New("review form is nil")
+	}
+
+	var userID UserAccountID
+	var productItemID uint64
+	var ratingValue int32
+	var comment pgtype.Text
+
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`
+			select
+				"user_id",
+				"order_product_id",
+				"rating_value",
+				"comment"
+			from user_reviews
+			where "id" = $1
+			limit 1
+		`,
+		rid,
+	).Scan(
+		&userID,
+		&productItemID,
+		&ratingValue,
+		&comment,
+	)
+	if err != nil {
+		return err
+	}
+
+	reviewForm.ID = rid
+	reviewForm.UserAccountID = userID
+	reviewForm.RatingValue = &ratingValue
+
+	if comment.Valid {
+		reviewForm.Comment = &comment.String
+	} else {
+		reviewForm.Comment = nil
+	}
+
+	if productItemID != 0 {
+		reviewForm.ProductItem = &scommerce.BuiltinProductItem[UserAccountID]{
+			DB: db,
+			ProductItemForm: scommerce.ProductItemForm[UserAccountID]{
+				ID: productItemID,
+			},
+		}
+	} else {
+		reviewForm.ProductItem = nil
+	}
+
+	return nil
 }
