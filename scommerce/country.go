@@ -95,6 +95,18 @@ func (countryManager *BuiltinCountryManager) GetCountries(ctx context.Context, c
 	return cons, nil
 }
 
+func (countryManager *BuiltinCountryManager) GetCountryWithID(ctx context.Context, cid uint64, fill bool) (Country, error) {
+	if !fill {
+		return countryManager.newBuiltinCountry(ctx, cid, countryManager.DB, nil)
+	}
+	countryForm := CountryForm{}
+	err := countryManager.DB.FillCountryWithID(ctx, cid, &countryForm)
+	if err != nil {
+		return nil, err
+	}
+	return countryManager.newBuiltinCountry(ctx, cid, countryManager.DB, &countryForm)
+}
+
 func (countryManager *BuiltinCountryManager) Init(ctx context.Context) error {
 	return countryManager.DB.InitCountryManager(ctx)
 }

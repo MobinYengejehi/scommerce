@@ -2,6 +2,7 @@ package dbsamples
 
 import (
 	"context"
+	"errors"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
 )
@@ -199,4 +200,26 @@ func (db *PostgreDatabase) RemoveShippingMethod(ctx context.Context, shippingMet
 		shippingMethod,
 	)
 	return err
+}
+
+func (db *PostgreDatabase) FillShippingMethodWithID(ctx context.Context, sid uint64, methodForm *scommerce.ShippingMethodForm) error {
+	if methodForm == nil {
+		return errors.New("shipping method form is nil")
+	}
+
+	var name string
+	var price float64
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`select "name", "price" from shipping_methods where "id" = $1 limit 1`,
+		sid,
+	).Scan(&name, &price)
+	if err != nil {
+		return err
+	}
+
+	methodForm.ID = sid
+	methodForm.Name = &name
+	methodForm.Price = &price
+	return nil
 }

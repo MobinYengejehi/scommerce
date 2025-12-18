@@ -2,6 +2,7 @@ package dbsamples
 
 import (
 	"context"
+	"errors"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
 )
@@ -165,4 +166,24 @@ func (db *PostgreDatabase) RemovePaymentType(ctx context.Context, paymentType ui
 		paymentType,
 	)
 	return err
+}
+
+func (db *PostgreDatabase) FillPaymentTypeWithID(ctx context.Context, pid uint64, typeForm *scommerce.PaymentTypeForm) error {
+	if typeForm == nil {
+		return errors.New("payment type form is nil")
+	}
+
+	var name string
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`select "name" from payment_types where "id" = $1 limit 1`,
+		pid,
+	).Scan(&name)
+	if err != nil {
+		return err
+	}
+
+	typeForm.ID = pid
+	typeForm.Name = &name
+	return nil
 }

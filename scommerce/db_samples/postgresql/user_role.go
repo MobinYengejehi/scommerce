@@ -2,6 +2,7 @@ package dbsamples
 
 import (
 	"context"
+	"errors"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
 )
@@ -163,4 +164,24 @@ func (db *PostgreDatabase) SetUserRoleName(ctx context.Context, form *scommerce.
 		id,
 	)
 	return err
+}
+
+func (db *PostgreDatabase) FillUserRoleWithID(ctx context.Context, rid uint64, roleForm *scommerce.UserRoleForm) error {
+	if roleForm == nil {
+		return errors.New("role form is nil")
+	}
+
+	var name string
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`select "name" from roles where "id" = $1 limit 1`,
+		rid,
+	).Scan(&name)
+	if err != nil {
+		return err
+	}
+
+	roleForm.ID = rid
+	roleForm.Name = &name
+	return nil
 }

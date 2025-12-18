@@ -96,6 +96,18 @@ func (shippingMethodManager *BuiltinShippingMethodManager) GetShippingMethods(ct
 	return methods, nil
 }
 
+func (shippingMethodManager *BuiltinShippingMethodManager) GetShippingMethodWithID(ctx context.Context, sid uint64, fill bool) (ShippingMethod, error) {
+	if !fill {
+		return shippingMethodManager.newBuiltinShippingMethod(ctx, sid, shippingMethodManager.DB, nil)
+	}
+	methodForm := ShippingMethodForm{}
+	err := shippingMethodManager.DB.FillShippingMethodWithID(ctx, sid, &methodForm)
+	if err != nil {
+		return nil, err
+	}
+	return shippingMethodManager.newBuiltinShippingMethod(ctx, sid, shippingMethodManager.DB, &methodForm)
+}
+
 func (shippingMethodManager *BuiltinShippingMethodManager) Init(ctx context.Context) error {
 	return shippingMethodManager.DB.InitShippingMethodManager(ctx)
 }

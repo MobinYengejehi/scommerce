@@ -2,6 +2,7 @@ package dbsamples
 
 import (
 	"context"
+	"errors"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
 )
@@ -165,4 +166,24 @@ func (db *PostgreDatabase) RemoveCountry(ctx context.Context, country uint64) er
 		country,
 	)
 	return err
+}
+
+func (db *PostgreDatabase) FillCountryWithID(ctx context.Context, cid uint64, countryForm *scommerce.CountryForm) error {
+	if countryForm == nil {
+		return errors.New("country form is nil")
+	}
+
+	var name string
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`select "name" from countries where "id" = $1 limit 1`,
+		cid,
+	).Scan(&name)
+	if err != nil {
+		return err
+	}
+
+	countryForm.ID = cid
+	countryForm.Name = &name
+	return nil
 }

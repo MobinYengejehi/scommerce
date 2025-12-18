@@ -95,6 +95,18 @@ func (userRoleManager *BuiltinUserRoleManager) GetUserRoles(ctx context.Context,
 	return types, nil
 }
 
+func (userRoleManager *BuiltinUserRoleManager) GetRoleWithID(ctx context.Context, rid uint64, fill bool) (UserRole, error) {
+	if !fill {
+		return userRoleManager.newBuiltinUserRole(ctx, rid, userRoleManager.DB, nil)
+	}
+	roleForm := UserRoleForm{}
+	err := userRoleManager.DB.FillUserRoleWithID(ctx, rid, &roleForm)
+	if err != nil {
+		return nil, err
+	}
+	return userRoleManager.newBuiltinUserRole(ctx, rid, userRoleManager.DB, &roleForm)
+}
+
 func (userRoleManager *BuiltinUserRoleManager) Init(ctx context.Context) error {
 	return userRoleManager.DB.InitUserRoleManager(ctx)
 }

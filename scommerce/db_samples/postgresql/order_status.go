@@ -2,6 +2,7 @@ package dbsamples
 
 import (
 	"context"
+	"errors"
 
 	"github.com/MobinYengejehi/scommerce/scommerce"
 )
@@ -216,4 +217,24 @@ func (db *PostgreDatabase) RemoveOrderStatus(ctx context.Context, status uint64)
 		status,
 	)
 	return err
+}
+
+func (db *PostgreDatabase) FillOrderStatusWithID(ctx context.Context, sid uint64, statusForm *scommerce.OrderStatusForm) error {
+	if statusForm == nil {
+		return errors.New("order status form is nil")
+	}
+
+	var name string
+	err := db.PgxPool.QueryRow(
+		ctx,
+		`select "status" from order_statuses where "id" = $1 limit 1`,
+		sid,
+	).Scan(&name)
+	if err != nil {
+		return err
+	}
+
+	statusForm.ID = sid
+	statusForm.Name = &name
+	return nil
 }

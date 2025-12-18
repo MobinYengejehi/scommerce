@@ -95,6 +95,18 @@ func (paymentTypeManager *BuiltinPaymentTypeManager) GetPaymentTypes(ctx context
 	return types, nil
 }
 
+func (paymentTypeManager *BuiltinPaymentTypeManager) GetPaymentTypeWithID(ctx context.Context, pid uint64, fill bool) (PaymentType, error) {
+	if !fill {
+		return paymentTypeManager.newBuiltinPaymentType(ctx, pid, paymentTypeManager.DB, nil)
+	}
+	typeForm := PaymentTypeForm{}
+	err := paymentTypeManager.DB.FillPaymentTypeWithID(ctx, pid, &typeForm)
+	if err != nil {
+		return nil, err
+	}
+	return paymentTypeManager.newBuiltinPaymentType(ctx, pid, paymentTypeManager.DB, &typeForm)
+}
+
 func (paymentTypeManager *BuiltinPaymentTypeManager) Init(ctx context.Context) error {
 	return paymentTypeManager.DB.InitPaymentTypeManager(ctx)
 }

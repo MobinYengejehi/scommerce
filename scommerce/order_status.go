@@ -114,6 +114,18 @@ func (orderStatusManager *BuiltinOrderStatusManager) GetOrderStatuses(ctx contex
 	return statuses, nil
 }
 
+func (orderStatusManager *BuiltinOrderStatusManager) GetOrderStatusWithID(ctx context.Context, sid uint64, fill bool) (OrderStatus, error) {
+	if !fill {
+		return orderStatusManager.newBuiltinOrderStatus(ctx, sid, orderStatusManager.DB, nil)
+	}
+	statusForm := OrderStatusForm{}
+	err := orderStatusManager.DB.FillOrderStatusWithID(ctx, sid, &statusForm)
+	if err != nil {
+		return nil, err
+	}
+	return orderStatusManager.newBuiltinOrderStatus(ctx, sid, orderStatusManager.DB, &statusForm)
+}
+
 func (orderStatusManager *BuiltinOrderStatusManager) Init(ctx context.Context) error {
 	return orderStatusManager.DB.InitOrderStatusManager(ctx)
 }
