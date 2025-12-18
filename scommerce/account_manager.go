@@ -117,7 +117,15 @@ func (accountManager *BuiltinUserAccountManager[AccountID]) GetAccountCount(ctx 
 }
 
 func (accountManager *BuiltinUserAccountManager[AccountID]) GetAccountWithID(ctx context.Context, aid AccountID, fill bool) (UserAccount[AccountID], error) {
-	return accountManager.newUserAccount(ctx, aid, accountManager.DB, nil)
+	if !fill {
+		return accountManager.newUserAccount(ctx, aid, accountManager.DB, nil)
+	}
+	accountForm := UserAccountForm[AccountID]{}
+	err := accountManager.DB.FillUserAccountWithID(ctx, aid, &accountForm)
+	if err != nil {
+		return nil, err
+	}
+	return accountManager.newUserAccount(ctx, aid, accountManager.DB, &accountForm)
 }
 
 func (accountManager *BuiltinUserAccountManager[AccountID]) GetAccounts(ctx context.Context, accounts []UserAccount[AccountID], skip int64, limit int64, queueOrder QueueOrder) ([]UserAccount[AccountID], error) {
