@@ -595,47 +595,45 @@ func (db *PostgreDatabase) FillUserAccountWithID(ctx context.Context, aid UserAc
 		return err
 	}
 
-	if accountForm != nil {
-		var images []string
-		if profileImagesRaw != nil {
-			if err := json.Unmarshal(profileImagesRaw, &images); err != nil {
-				return err
-			}
+	var images []string
+	if profileImagesRaw != nil {
+		if err := json.Unmarshal(profileImagesRaw, &images); err != nil {
+			return err
 		}
-
-		var bReason *string = nil
-		if banTill.Valid && banReason.Valid {
-			bReason = &banReason.String
-		}
-
-		accountForm.ID = aid
-		accountForm.Token = &token
-		if firstName.Valid {
-			accountForm.FirstName = &firstName.String
-		}
-		if lastName.Valid {
-			accountForm.LastName = &lastName.String
-		}
-		if updatedAt.Valid {
-			accountForm.LastUpdatedAt = &updatedAt.Time
-		}
-		if roleID.Valid {
-			accountForm.Role = &scommerce.BuiltinUserRole{
-				DB: db,
-				UserRoleForm: scommerce.UserRoleForm{
-					ID: uint64(roleID.Int64),
-				},
-			}
-		}
-		accountForm.UserLevel = &level
-		accountForm.IsActiveState = &isActive
-		accountForm.ProfileImages = db.getSafeImages(images)
-		if bio.Valid {
-			accountForm.Bio = &bio.String
-		}
-		accountForm.WalletCurrency = &wallet
-		accountForm.IsBannedState = bReason
 	}
+
+	var bReason *string = nil
+	if banTill.Valid && banReason.Valid {
+		bReason = &banReason.String
+	}
+
+	accountForm.ID = aid
+	accountForm.Token = &token
+	if firstName.Valid {
+		accountForm.FirstName = &firstName.String
+	}
+	if lastName.Valid {
+		accountForm.LastName = &lastName.String
+	}
+	if updatedAt.Valid {
+		accountForm.LastUpdatedAt = &updatedAt.Time
+	}
+	if roleID.Valid {
+		accountForm.Role = &scommerce.BuiltinUserRole{
+			DB: db,
+			UserRoleForm: scommerce.UserRoleForm{
+				ID: uint64(roleID.Int64),
+			},
+		}
+	}
+	accountForm.UserLevel = &level
+	accountForm.IsActiveState = &isActive
+	accountForm.ProfileImages = db.getSafeImages(images)
+	if bio.Valid {
+		accountForm.Bio = &bio.String
+	}
+	accountForm.WalletCurrency = &wallet
+	accountForm.IsBannedState = bReason
 
 	return nil
 }
