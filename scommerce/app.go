@@ -23,6 +23,7 @@ type App[AccountID comparable] struct {
 	UserReviewManager     UserReviewManager[AccountID]
 	SubscriptionManager   ProductItemSubscriptionManager[AccountID]
 	DiscountManager       UserDiscountManager[AccountID]
+	FactorManager         UserFactorManager[AccountID]
 }
 
 type AppConfig[AccountID comparable] struct {
@@ -48,7 +49,8 @@ func NewBuiltinApplication[AccountID comparable](conf *AppConfig[AccountID]) (*A
 	shoppingCartManager := NewBuiltinUserShoppingCartManager(conf.DB, conf.FileStorage, orderStatusManager)
 	userReviewManager := NewBuiltinUserReviewManager(conf.DB, conf.FileStorage)
 	subscriptionManager := NewBuiltinProductItemSubscriptionManager(conf.DB, conf.FileStorage, conf.SubscriptionRenewalHandler)
-	
+	factorManager := NewBuiltinUserFactorManager(conf.DB)
+
 	discountCodeLength := conf.DiscountCodeLength
 	if discountCodeLength == 0 {
 		discountCodeLength = 8
@@ -82,6 +84,7 @@ func NewBuiltinApplication[AccountID comparable](conf *AppConfig[AccountID]) (*A
 		UserReviewManager:     userReviewManager,
 		SubscriptionManager:   subscriptionManager,
 		DiscountManager:       discountManager,
+		FactorManager:         factorManager,
 	}, nil
 }
 
@@ -101,6 +104,7 @@ func (app *App[AccountID]) Close(ctx context.Context) error {
 	err = joinErr(err, app.OrderStatusManager.Close(ctx))
 	err = joinErr(err, app.SubscriptionManager.Close(ctx))
 	err = joinErr(err, app.DiscountManager.Close(ctx))
+	err = joinErr(err, app.FactorManager.Close(ctx))
 
 	return err
 }
@@ -122,6 +126,7 @@ func (app *App[AccountID]) Init(ctx context.Context) error {
 	err = joinErr(err, app.OrderManager.Init(ctx))
 	err = joinErr(err, app.SubscriptionManager.Init(ctx))
 	err = joinErr(err, app.DiscountManager.Init(ctx))
+	err = joinErr(err, app.FactorManager.Init(ctx))
 
 	return err
 }
@@ -143,6 +148,7 @@ func (app *App[AccountID]) Pulse(ctx context.Context) error {
 	err = joinErr(err, app.UserReviewManager.Pulse(ctx))
 	err = joinErr(err, app.SubscriptionManager.Pulse(ctx))
 	err = joinErr(err, app.DiscountManager.Pulse(ctx))
+	err = joinErr(err, app.FactorManager.Pulse(ctx))
 
 	return err
 }
