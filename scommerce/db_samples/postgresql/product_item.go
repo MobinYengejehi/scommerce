@@ -184,8 +184,8 @@ func (db *PostgreDatabase) SetProductItemAttributes(ctx context.Context, form *s
 	_, err := db.PgxPool.Exec(
 		ctx,
 		`update product_items set "attributes" = $1 where "id" = $2`,
-		pid,
 		attrs,
+		pid,
 	)
 	if err != nil {
 		return err
